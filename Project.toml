@@ -1,0 +1,4 @@
+name = "CPEG"
+uuid = "4cbbe798-562d-45c6-9176-afd37cca9fc1"
+authors = ["Kevin Tracy <kevt.laser@gmail.com>"]
+version = "0.1.0"
