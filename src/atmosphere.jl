@@ -37,10 +37,12 @@ function density(p::DensityParameters, h::T)::T where T
    exp(num/den)
 end
 
+@inline function altitude(ev::EntryVehicle,r::SVector{3,T})::T where T
+    norm(r) - ev.params.gravity.R
+end
 
 @inline function density(ev::EntryVehicle,r::SVector{3,T})::T where T
-    h = norm(r) - ev.params.gravity.R
-    return density(ev.params.density,h)
+    return density(ev.params.density,altitude(ev,r))
 end
 
 # let
