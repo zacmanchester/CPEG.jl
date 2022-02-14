@@ -1,9 +1,3 @@
-
-
-# const GM_MARS = 4.2828375816e13
-# const J2_MARS = 1960.45e-6
-# const R_MARS = 3386.2
-
 struct GravityParameters
     μ::Float64
     J2::Float64
