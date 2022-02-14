@@ -1,84 +1,21 @@
 
-struct Parameters
-    density::DensityParameters
-    gravity::GravityParameters
-    aero::AeroParameters
-    function Parameters()
-        new(DensityParameters(),GravityParameters(),AeroParameters())
-    end
-end
-
-struct Scaling
-    dscale::Float64
-    tscale::Float64
-    uscale::Float64
-    function Scaling()
-        new(1e6,1e3,1e3)
-    end
-end
-
-struct Planet
-    Ω::Float64
-    ω::SVector{3,Float64}
-    function Planet()
-        Ω = 7.088218127774194e-5 # rad/s
-        ω = SA[0,0,Ω]
-        return new(Ω,ω)
-    end
-end
-
-struct EntryVehicle
-    params::Parameters
-    scale::Scaling
-    planet::Planet
-    function EntryVehicle()
-        new(Parameters(),Scaling(),Planet())
-    end
-end
-
-@inline function scale_rv(ev::EntryVehicle,r::SVector{3,T},v::SVector{3,T})::Tuple{SVector{3,T},SVector{3,T}} where T
-    r = r/ev.scale.dscale
-    v = v/(ev.scale.dscale/ev.scale.tscale)
-    return r,v
-end
-
-@inline function unscale_rv(ev::EntryVehicle,r::SVector{3,T},v::SVector{3,T})::Tuple{SVector{3,T},SVector{3,T}} where T
-    r = r*ev.scale.dscale
-    v = v*(ev.scale.dscale/ev.scale.tscale)
-    return r,v
-end
-
-@inline function scale_va(ev::EntryVehicle,v::SVector{3,T},a::SVector{3,T})::Tuple{SVector{3,T},SVector{3,T}} where T
-    v = v/(ev.scale.dscale/ev.scale.tscale)
-    a = v/(ev.scale.dscale/ev.scale.tscale^2)
-    return v,a
-end
-
-@inline function unscale_va(ev::EntryVehicle,v::SVector{3,T},a::SVector{3,T})::Tuple{SVector{3,T},SVector{3,T}} where T
-    v = v*(ev.scale.dscale/ev.scale.tscale)
-    a = v*(ev.scale.dscale/ev.scale.tscale^2)
-    return v,a
-end
-
-function dynamics(ev::EntryVehicle, x::SVector{7,T}, u::SVector{1,W})::SVector{7,T} where {T,W}
-
-    # scaling numbers
-    dscale = ev.scale.dscale
-    tscale = ev.scale.tscale
-    uscale = ev.scale.uscale
+function dynamics(ev::EntryVehicle, x::SVector{7,T}, u::SVector{1,W}) where {T,W}
 
     # scaled variables
-    r = x[SA[1,2,3]]
-    v = x[SA[4,5,6]]
+    r_scaled = x[SA[1,2,3]]
+    v_scaled = x[SA[4,5,6]]
     σ = x[7]
 
     # unscale
-    r,v=unscale(ev,r,v)
+    r, v = unscale(ev.scale,r_scaled,v_scaled)
 
-    # ρ = density(ev,r)
-    L,D = LD_mags(ev,r,v)
+    # density
+    ρ = density(ev.params.density, r)
 
-    e1,e2 = e_frame(r,v)
+
+    L, D = LD_mags(ev,r,v)
+
+    e1, e2 = e_frame(r,v)
 
     D_a = -(D/norm(v))*v
     L_a = L*sin(σ)*e1 + L*cos(σ)*e2
@@ -86,16 +23,23 @@ function dynamics(ev::EntryVehicle, x::SVector{7,T}, u::SVector{1,W})::SVector{7
     g = gravity(ev.params.gravity,r)
 
     ω = ev.planet.ω
-    v̇ = D_a + L_a + g - 2*cross(ω,v) - cross(ω,cross(ω,r))
+    a = D_a + L_a + g - 2*cross(ω,v) - cross(ω,cross(ω,r))
 
     # rescale units
-    v = v/(dscale/tscale)
-    v̇ = v̇/(dscale/tscale^2)
+    v,a = scale_va(ev.scale,v,a)
 
-    return SA[v[1],v[2],v[3],v̇[1],v̇[2],v̇[3],u[1]*uscale]
+    return SA[v[1],v[2],v[3],a[1],a[2],a[3],u[1]*ev.scale.uscale]
 end
 
-function rk4(ev::EntryVehicle,x_n::SVector{7,T},u::SVector{1,W},dt::Float64)::SVector{7,T} where {T,W}
+# function f(x::SVector{7,T},u::SVector{1,W})::SVector{7,T} where {T,W}
+
+
+function rk4(
+    ev::EntryVehicle,
+    x_n::SVector{7,T},
+    u::SVector{1,W},
+    dt::Float64) where {T,W}
+
     k1 = dt*dynamics(ev,x_n,u)
     k2 = dt*dynamics(ev,x_n+k1/2,u)
     k3 = dt*dynamics(ev,x_n+k2/2,u)
@@ -103,7 +47,7 @@ function rk4(ev::EntryVehicle,x_n::SVector{7,T},u::SVector{1,W},dt::Float64)::SV
     return (x_n + (1/6)*(k1 + 2*k2 + 2*k3 + k4))
 end
 
-function rollout(ev::EntryVehicle,x0::SVector{7,T},U_in::Vector{SVector{1,T}},dt::Float64)::Tuple{Vector{SVector{7,T}},Vector{SVector{1,T}}} where T
+function rollout(ev::EntryVehicle,x0::SVector{7,T},U_in::Vector{SVector{1,T}},dt::Float64) where T
     N = 1000
     X = [@SVector zeros(length(x0)) for i = 1:N]
     U = [@SVector zeros(length(U_in[1])) for i = 1:N]
@@ -133,6 +77,20 @@ function rollout(ev::EntryVehicle,x0::SVector{7,T},U_in::Vector{SVector{1,T}},dt
     U = U[1:(end_idx-1)]
     return X, U
 end
+
+function get_jacobians(
+    ev::EntryVehicle,
+    X::Vector{SVector{7,T}},
+    U::Vector{SVector{1,T}},
+    dt::Float64
+    ) where T
+
+    N = length(X)
+    A = [ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt),X[i]) for i = 1:N-1]
+    B = [ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt),U[i]) for i = 1:N-1]
+    return A,B
+end
+
 
 
 let
@@ -181,6 +139,11 @@ let
 
     # @show X[1]
     # @show typeof(X[1])
+
+    i = 7
+    @show ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt),X[i])
+    @show ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt),U[i])
+    # A,B= get_jacobians(ev,X,U,dt)
 
 
 

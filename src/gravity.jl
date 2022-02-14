@@ -10,7 +10,7 @@ struct GravityParameters
     end
 end
 
-@inline function gravity(g::GravityParameters,r::SVector{3, T})::SVector{3, T} where T
+@inline function gravity(g::GravityParameters,r::SVector{3, T}) where T
 
     nr = norm(r)
 

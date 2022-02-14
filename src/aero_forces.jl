@@ -26,11 +26,7 @@ struct AeroParameters
     end
 end
 
-@inline function LD_mags(ev::EntryVehicle,r::SVector{3,T},v::SVector{3,T})::Tuple{T,T} where T
-
-    ρ = density(ev,r)
-
-    aero = ev.params.aero
+@inline function LD_mags(aero::AeroParameters,ρ::T,r::SVector{3,T},v::SVector{3,T}) where T
 
     dynamic_ρ = 0.5*ρ*aero.A*dot(v,v)/aero.m
 
@@ -41,7 +37,7 @@ end
 end
 
 
-@inline function e_frame(r::SVector{3, T},v::SVector{3, T})::Tuple{SVector{3, T},SVector{3, T}} where T
+@inline function e_frame(r::SVector{3, T},v::SVector{3, T}) where T
     e1 = cross(r,v)
     e1 = e1/norm(e1)
     e2 = cross(v,e1)

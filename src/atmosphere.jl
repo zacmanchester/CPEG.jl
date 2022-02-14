@@ -25,7 +25,7 @@ struct DensityParameters
     end
 end
 
-function density(p::DensityParameters, h::T)::T where T
+function density(p::DensityParameters, h::T) where T
    h = h / 1000
    if h > 125.0
        h = 125.0
@@ -37,13 +37,6 @@ function density(p::DensityParameters, h::T)::T where T
    exp(num/den)
 end
 
-@inline function altitude(ev::EntryVehicle,r::SVector{3,T})::T where T
-    norm(r) - ev.params.gravity.R
-end
-
-@inline function density(ev::EntryVehicle,r::SVector{3,T})::T where T
-    return density(ev.params.density,altitude(ev,r))
-end
 
 # let
 #
