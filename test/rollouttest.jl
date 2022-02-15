@@ -89,4 +89,19 @@ ev2.scale.uscale = 1.0
 
 X2 = test_rollout(ev2,r0,v0,σ0)
 
-# for i = 1:length(X1)
+@test length(X1) == length(X2)
+for i = 1:length(X1)
+
+    r1_sc = SVector{3}(X1[i][1:3])
+    v1_sc = SVector{3}(X1[i][4:6])
+
+    r1,v1 = CPEG.unscale_rv(ev1.scale,r1_sc,v1_sc)
+
+    r2_sc = SVector{3}(X2[i][1:3])
+    v2_sc = SVector{3}(X2[i][4:6])
+
+    r2,v2 = CPEG.unscale_rv(ev2.scale,r2_sc,v2_sc)
+
+    @test r1 ≈ r2 rtol = 1e-6
+    @test v1 ≈ v2 rtol = 1e-6
+end

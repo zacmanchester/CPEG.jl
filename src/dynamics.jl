@@ -52,6 +52,7 @@ function rk4(
 end
 
 function rollout(ev::EntryVehicle,x0::SVector{7,T},U_in::Vector{SVector{1,T}},dt::Float64) where T
+    """everything in and out of the function is scaled"""
     N = 1000
     X = [@SVector zeros(length(x0)) for i = 1:N]
     U = [@SVector zeros(length(U_in[1])) for i = 1:N]
