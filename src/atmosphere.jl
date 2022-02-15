@@ -1,5 +1,4 @@
 
-
 struct DensityParameters
     a::Float64
     b::Float64

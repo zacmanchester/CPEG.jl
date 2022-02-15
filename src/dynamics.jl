@@ -7,21 +7,29 @@ function dynamics(ev::EntryVehicle, x::SVector{7,T}, u::SVector{1,W}) where {T,W
     σ = x[7]
 
     # unscale
-    r, v = unscale(ev.scale,r_scaled,v_scaled)
+    r, v = unscale_rv(ev.scale,r_scaled,v_scaled)
+
+    # altitude
+    h = norm(r) - ev.params.gravity.R
 
     # density
-    ρ = density(ev.params.density, r)
+    ρ = density(ev.params.density, h)
+    @show ρ
 
+    # lift and drag magnitudes
+    L, D = LD_mags(ev.params.aero,ρ,r,v)
 
-    L, D = LD_mags(ev,r,v)
-
+    # basis for e frame
     e1, e2 = e_frame(r,v)
 
+    # drag and lift accelerations
     D_a = -(D/norm(v))*v
     L_a = L*sin(σ)*e1 + L*cos(σ)*e2
 
+    # gravity
     g = gravity(ev.params.gravity,r)
 
+    # acceleration
     ω = ev.planet.ω
     a = D_a + L_a + g - 2*cross(ω,v) - cross(ω,cross(ω,r))
 
@@ -30,9 +38,6 @@ function dynamics(ev::EntryVehicle, x::SVector{7,T}, u::SVector{1,W}) where {T,W
 
     return SA[v[1],v[2],v[3],a[1],a[2],a[3],u[1]*ev.scale.uscale]
 end
-
-# function f(x::SVector{7,T},u::SVector{1,W})::SVector{7,T} where {T,W}
-
 
 function rk4(
     ev::EntryVehicle,
@@ -117,7 +122,7 @@ let
     v0 = V0*SA[sin(γ0), cos(γ0), 0.0]
     σ0 = deg2rad(90)
 
-    r0,v0 = scale_rv(ev,r0,v0)
+    r0,v0 = scale_rv(ev.scale,r0,v0)
 
     dt = 1.0/ev.scale.tscale
 
@@ -140,9 +145,9 @@ let
     # @show X[1]
     # @show typeof(X[1])
 
-    i = 7
-    @show ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt),X[i])
-    @show ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt),U[i])
+    # i = 7
+    # @show ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt),X[i])
+    # @show ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt),U[i])
     # A,B= get_jacobians(ev,X,U,dt)
 
 

@@ -1,3 +1,4 @@
+
 struct Scaling
     dscale::Float64
     tscale::Float64
@@ -21,12 +22,12 @@ end
 
 @inline function scale_va(p::Scaling,v::SVector{3,T},a::SVector{3,T}) where T
     v = v/(p.dscale/p.tscale)
-    a = v/(p.dscale/p.tscale^2)
+    a = a/(p.dscale/p.tscale^2)
     return v,a
 end
 
 @inline function unscale_va(p::Scaling,v::SVector{3,T},a::SVector{3,T}) where T
     v = v*(p.dscale/p.tscale)
-    a = v*(p.dscale/p.tscale^2)
+    a = a*(p.dscale/p.tscale^2)
     return v,a
 end

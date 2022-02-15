@@ -1,7 +1,4 @@
 
-
-
-
 struct AeroParameters
     Cl::Float64
     Cd::Float64
