@@ -1,5 +1,5 @@
 
-struct Scaling
+mutable struct Scaling
     dscale::Float64
     tscale::Float64
     uscale::Float64

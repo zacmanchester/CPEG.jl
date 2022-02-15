@@ -62,11 +62,12 @@ function rollout(ev::EntryVehicle,x0::SVector{7,T},U_in::Vector{SVector{1,T}},dt
 
         X[i+1] = rk4(ev,X[i],U[i],dt)
 
-        @show (norm(X[i+1][1:3])*ev.scale.dscale - ev.params.gravity.R)/1e3
+        # for debugging purposes
+        # @show (norm(X[i+1][1:3])*ev.scale.dscale - ev.params.gravity.R)/1e3
 
         if (norm(X[i+1][1:3])*ev.scale.dscale - ev.params.gravity.R) < 10e3
-            @info "hit alt"
-            @show i
+            # @info "hit alt"
+            # @show i
             end_idx = i+1
             break
         end
@@ -97,102 +98,103 @@ end
 
 
 
-let
-
-    ev = EntryVehicle()
-
-    # # @show ev.scale.uscale
-    #
-    # x = @SVector randn(7)
-    # u = SA[1.45]
-    # #
-    # @btime dynamics($ev,$x,$u)
-    #
-    # @btime rk4($ev,$x,$u,0.1)
-    # #
-    # A = ForwardDiff.jacobian(_x -> dynamics(ev,_x,u),x)
-    # # @btime ForwardDiff.jacobian(_x -> dynamics($ev,_x,$u),$x)
-    # @btime ForwardDiff.jacobian(_x -> rk4($ev,_x,$u,0.1),$x)
-    # ForwardDiff.jacobian(_x -> rk4(ev,_x,u,0.1),x)
-    Rm = ev.params.gravity.R
-    r0 = SA[Rm+125e3, 0.0, 0.0] #Atmospheric interface at 125 km altitude
-    V0 = 5.845e3 #Mars-relative velocity at interface of 5.845 km/sec
-    γ0 = -15.474*(pi/180.0) #Flight path angle at interface
-    v0 = V0*SA[sin(γ0), cos(γ0), 0.0]
-    σ0 = deg2rad(90)
-
-    r0sc,v0sc = scale_rv(ev.scale,r0,v0)
-
-    dt = 1.0/ev.scale.tscale
-
-    x0 = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
-
-    # @show norm(r0)
-    #
-    # @show norm(r0)*ev.scale.dscale - ev.params.gravity.R
-    N = 100
-    U = [SA[0.0] for i = 1:N-1]
-    #
-    X,U = rollout(ev, x0, U, dt)
-    # N = 100
-    # X = [@SVector zeros(7) for i = 1:N]
-
-    # @show typeof([r0;v0;σ0])
-    # X[1] = SA[r0[1],r0[2],r0[3],v0[1],v0[2],v0[3],σ0]
-    # @btime $X[1] = SA[$r0[1],$r0[2],$r0[3],$v0[1],$v0[2],$v0[3],$σ0]
-
-    # @show X[1]
-    # @show typeof(X[1])
-
-    # i = 7
-    # @show ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt),X[i])
-    # @show ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt),U[i])
-    A,B= get_jacobians(ev,X,U,dt)
-
-    N = length(X)
-    Xm = zeros(7,N)
-    for i = 1:N
-        Xm[:,i] = X[i]
-    end
-
-    nr = [norm(X[i][1:3]) for i = 1:N]
-    nv = [norm(X[i][4:6]) for i = 1:N]
-    # mat"
-    # figure
-    # hold on
-    # plot($Xm(1:3,:)')
-    # hold off
-    # "
-    #
-    # mat"
-    # figure
-    # hold on
-    # plot($Xm(4:6,:)')
-    # hold off
-    # "
-    # mat"
-    # figure
-    # hold on
-    # plot($nr)
-    # plot($nv)
-    # hold off"
-
-    X = unscale_X(ev.scale,X)
-    # @show typeof(X[1][SA[1,2,3]])
-
-    alt, dr, cr = postprocess(ev,X,[r0;v0])
-
-
-    mat"
-    figure
-    hold on
-    plot($alt/1e3)
-    hold off "
-
-    mat"
-    figure
-    hold on
-    plot($dr/1e3,$cr/1e3)
-    hold off"
-
-end
+# let
+#
+#     ev = EntryVehicle()
+#
+#     # # @show ev.scale.uscale
+#     #
+#     # x = @SVector randn(7)
+#     # u = SA[1.45]
+#     # #
+#     # @btime dynamics($ev,$x,$u)
+#     #
+#     # @btime rk4($ev,$x,$u,0.1)
+#     # #
+#     # A = ForwardDiff.jacobian(_x -> dynamics(ev,_x,u),x)
+#     # # @btime ForwardDiff.jacobian(_x -> dynamics($ev,_x,$u),$x)
+#     # @btime ForwardDiff.jacobian(_x -> rk4($ev,_x,$u,0.1),$x)
+#     # ForwardDiff.jacobian(_x -> rk4(ev,_x,u,0.1),x)
+#     Rm = ev.params.gravity.R
+#     r0 = SA[Rm+125e3, 0.0, 0.0] #Atmospheric interface at 125 km altitude
+#     V0 = 5.845e3 #Mars-relative velocity at interface of 5.845 km/sec
+#     γ0 = -15.474*(pi/180.0) #Flight path angle at interface
+#     v0 = V0*SA[sin(γ0), cos(γ0), 0.0]
+#     σ0 = deg2rad(90)
+#
+#     r0sc,v0sc = scale_rv(ev.scale,r0,v0)
+#
+#     dt = 1.0/ev.scale.tscale
+#
+#     x0 = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
+#
+#     # @show norm(r0)
+#     #
+#     # @show norm(r0)*ev.scale.dscale - ev.params.gravity.R
+#     N = 100
+#     U = [SA[0.0] for i = 1:N-1]
+#     #
+#     X,U = rollout(ev, x0, U, dt)
+#     @show length(X)
+#     # N = 100
+#     # X = [@SVector zeros(7) for i = 1:N]
+#
+#     # @show typeof([r0;v0;σ0])
+#     # X[1] = SA[r0[1],r0[2],r0[3],v0[1],v0[2],v0[3],σ0]
+#     # @btime $X[1] = SA[$r0[1],$r0[2],$r0[3],$v0[1],$v0[2],$v0[3],$σ0]
+#
+#     # @show X[1]
+#     # @show typeof(X[1])
+#
+#     # i = 7
+#     # @show ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt),X[i])
+#     # @show ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt),U[i])
+#     # A,B= get_jacobians(ev,X,U,dt)
+#     #
+#     # N = length(X)
+#     # Xm = zeros(7,N)
+#     # for i = 1:N
+#     #     Xm[:,i] = X[i]
+#     # end
+#     #
+#     # nr = [norm(X[i][1:3]) for i = 1:N]
+#     # nv = [norm(X[i][4:6]) for i = 1:N]
+#     # mat"
+#     # figure
+#     # hold on
+#     # plot($Xm(1:3,:)')
+#     # hold off
+#     # "
+#     #
+#     # mat"
+#     # figure
+#     # hold on
+#     # plot($Xm(4:6,:)')
+#     # hold off
+#     # "
+#     # mat"
+#     # figure
+#     # hold on
+#     # plot($nr)
+#     # plot($nv)
+#     # hold off"
+#
+#     # X = unscale_X(ev.scale,X)
+#     # # @show typeof(X[1][SA[1,2,3]])
+#     #
+#     # alt, dr, cr = postprocess(ev,X,[r0;v0])
+#     #
+#     #
+#     # mat"
+#     # figure
+#     # hold on
+#     # plot($alt/1e3)
+#     # hold off "
+#     #
+#     # mat"
+#     # figure
+#     # hold on
+#     # plot($dr/1e3,$cr/1e3)
+#     # hold off"
+#
+# end
