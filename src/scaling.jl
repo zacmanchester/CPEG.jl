@@ -31,3 +31,15 @@ end
     a = a*(p.dscale/p.tscale^2)
     return v,a
 end
+
+
+function unscale_X(p::Scaling,X::Vector{SVector{7,Float64}})
+    N = length(X)
+    Xu = [@SVector zeros(7) for i = 1:N]
+    for i = 1:N
+        r,v = unscale_rv(p,X[i][SA[1,2,3]],X[i][SA[4,5,6]])
+        σ = X[i][7]
+        Xu[i] = SVector{7}([r;v;σ])
+    end
+    return Xu
+end

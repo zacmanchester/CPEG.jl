@@ -14,7 +14,6 @@ function dynamics(ev::EntryVehicle, x::SVector{7,T}, u::SVector{1,W}) where {T,W
 
     # density
     ρ = density(ev.params.density, h)
-    @show ρ
 
     # lift and drag magnitudes
     L, D = LD_mags(ev.params.aero,ρ,r,v)
@@ -122,11 +121,11 @@ let
     v0 = V0*SA[sin(γ0), cos(γ0), 0.0]
     σ0 = deg2rad(90)
 
-    r0,v0 = scale_rv(ev.scale,r0,v0)
+    r0sc,v0sc = scale_rv(ev.scale,r0,v0)
 
     dt = 1.0/ev.scale.tscale
 
-    x0 = SA[r0[1],r0[2],r0[3],v0[1],v0[2],v0[3],σ0]
+    x0 = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
 
     # @show norm(r0)
     #
@@ -148,8 +147,52 @@ let
     # i = 7
     # @show ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt),X[i])
     # @show ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt),U[i])
-    # A,B= get_jacobians(ev,X,U,dt)
+    A,B= get_jacobians(ev,X,U,dt)
+
+    N = length(X)
+    Xm = zeros(7,N)
+    for i = 1:N
+        Xm[:,i] = X[i]
+    end
+
+    nr = [norm(X[i][1:3]) for i = 1:N]
+    nv = [norm(X[i][4:6]) for i = 1:N]
+    # mat"
+    # figure
+    # hold on
+    # plot($Xm(1:3,:)')
+    # hold off
+    # "
+    #
+    # mat"
+    # figure
+    # hold on
+    # plot($Xm(4:6,:)')
+    # hold off
+    # "
+    # mat"
+    # figure
+    # hold on
+    # plot($nr)
+    # plot($nv)
+    # hold off"
+
+    X = unscale_X(ev.scale,X)
+    # @show typeof(X[1][SA[1,2,3]])
+
+    alt, dr, cr = postprocess(ev,X,[r0;v0])
 
 
+    mat"
+    figure
+    hold on
+    plot($alt/1e3)
+    hold off "
+
+    mat"
+    figure
+    hold on
+    plot($dr/1e3,$cr/1e3)
+    hold off"
 
 end
