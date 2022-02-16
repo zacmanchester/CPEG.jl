@@ -96,10 +96,25 @@ function eg_mpc_quad(
     cX = X + δx
     cU = U + δu
 
-    # return cU, norm(δu)
+    return cU, norm(δu)
 
-    return nothing
+    # return cU
 
+end
+
+function main_cpeg(ev,x0_s,U,dt,rf_s)
+
+    for i = 1:20
+        X,U = rollout(ev, x0_s, U, dt)
+        A,B = get_jacobians(ev,X,U,dt)
+        U, ndu = eg_mpc_quad(ev,A,B,X,U,rf_s)
+        @show ndu
+        if ndu<1e-2
+            @info "success"
+            return U
+        end
+    end
+    @error "CPEG failed"
 end
 
 function tt()
@@ -117,13 +132,13 @@ function tt()
 
         dt = 2.0/ev.scale.tscale
 
-        x0 = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
+        x0_s = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
 
 
         N = 100
         U = [SA[0.0] for i = 1:N-1]
         #
-        X,U = rollout(ev, x0, U, dt)
+        X,U = rollout(ev, x0_s, U, dt)
         @show length(X)
 
         A,B= get_jacobians(ev,X,U,dt)
@@ -139,23 +154,38 @@ function tt()
 
 
         eg_mpc_quad(ev,A,B,X,U,rf_s)
-        # X = unscale_X(ev.scale,X)
-        # # @show typeof(X[1][SA[1,2,3]])
-        #
-        # alt, dr, cr = postprocess(ev,X,[r0;v0])
-        #
-        #
-        # mat"
-        # figure
-        # hold on
-        # plot($alt/1e3)
-        # hold off "
-        #
-        # mat"
-        # figure
-        # hold on
-        # plot($dr/1e3,$cr/1e3)
-        # hold off"
+
+
+        @info "cPEG TIME"
+        Ucpeg = main_cpeg(ev,x0_s,U,dt,rf_s)
+
+        X,U = rollout(ev,x0_s,Ucpeg,dt)
+        X = unscale_X(ev.scale,X)
+        # @show typeof(X[1][SA[1,2,3]])
+
+        alt, dr, cr = postprocess(ev,X,[r0;v0])
+
+        σ = [X[i][7] for i = 1:length(X)]
+
+        mat"
+        figure
+        hold on
+        plot($alt/1e3)
+        hold off "
+
+        mat"
+        figure
+        hold on
+        plot($dr/1e3,$cr/1e3)
+        hold off"
+
+        mat"
+        figure
+        hold on
+        title('Bank Angle')
+        plot(rad2deg($σ))
+        hold off
+        "
 
         return nothing
 end
