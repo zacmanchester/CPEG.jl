@@ -49,8 +49,8 @@ function eg_mpc_quad(
     up_dyneq = copy(low_dyneq)
     low_x0 = zeros(nx)
     up_x0 = zeros(nx)
-    up_tr = deg2rad(10)*ones(N)
-    low_tr = -deg2rad(10)*ones(N)
+    up_tr = deg2rad(20)*ones(N)
+    low_tr = -deg2rad(20)*ones(N)
 
     low_eq = [low_dyneq;low_x0]
     up_eq = [up_dyneq;up_x0]
@@ -104,14 +104,22 @@ end
 
 function main_cpeg(ev,x0_s,U,dt,rf_s)
 
-    for i = 1:20
+    # vectors for storing trajectory information
+    T = 20
+    althist = [zeros(2) for i = 1:T]
+    drhist = [zeros(2) for i = 1:T]
+    crhist = [zeros(2) for i = 1:T]
+    dunorm = zeros(T)
+    for i = 1:T
         X,U = rollout(ev, x0_s, U, dt)
+
+        althist[i], drhist[i], crhist[i] = postprocess_scaled(ev,X,x0_s)
         A,B = get_jacobians(ev,X,U,dt)
         U, ndu = eg_mpc_quad(ev,A,B,X,U,rf_s)
         @show ndu
         if ndu<1e-2
             @info "success"
-            return U
+            return U, althist[1:i], drhist[1:i], crhist[1:i]
         end
     end
     @error "CPEG failed"
@@ -157,39 +165,116 @@ function tt()
 
 
         @info "cPEG TIME"
-        Ucpeg = main_cpeg(ev,x0_s,U,dt,rf_s)
+        Ucpeg, althist, drhist, crhist = main_cpeg(ev,x0_s,U,dt,rf_s)
 
-        X,U = rollout(ev,x0_s,Ucpeg,dt)
-        X = unscale_X(ev.scale,X)
-        # @show typeof(X[1][SA[1,2,3]])
+        xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
 
-        alt, dr, cr = postprocess(ev,X,[r0;v0])
 
-        σ = [X[i][7] for i = 1:length(X)]
-
-        mat"
-        figure
-        hold on
-        plot($alt/1e3)
-        hold off "
-
-        mat"
-        figure
-        hold on
-        plot($dr/1e3,$cr/1e3)
-        hold off"
-
-        mat"
-        figure
-        hold on
-        title('Bank Angle')
-        plot(rad2deg($σ))
-        hold off
-        "
+        num2plot = float(length(althist))
+        plot_groundtracks(drhist,crhist,althist,xf_dr,xf_cr,num2plot,"quad")
+        # @show xf_dr/1e3
+        # @show xf_cr/1e3
+        # X,U = rollout(ev,x0_s,Ucpeg,dt)
+        # X = unscale_X(ev.scale,X)
+        # # @show typeof(X[1][SA[1,2,3]])
+        #
+        # alt, dr, cr = postprocess(ev,X,[r0;v0])
+        #
+        # σ = [X[i][7] for i = 1:length(X)]
+        #
+        # mat"
+        # figure
+        # hold on
+        # plot($alt/1e3)
+        # hold off "
+        #
+        # mat"
+        # figure
+        # hold on
+        # plot($dr/1e3,$cr/1e3)
+        # hold off"
+        #
+        # mat"
+        # figure
+        # hold on
+        # title('Bank Angle')
+        # plot(rad2deg($σ))
+        # hold off
+        # "
 
         return nothing
 end
 
+function plot_groundtracks(drhist,crhist,althist,xf_dr,xf_cr,num2plot,id)
 
+    mat"
+    figure
+    hold on
+    rgb1 = [29 38 113]/255;
+    rgb2 = 1.3*[195 55 100]/255;
+    drgb = rgb2-rgb1;
+    cmap = [];
+    for i = 1:round($num2plot)
+        px = $drhist{i};
+        py = $crhist{i};
+        plot(px,py,'Color',rgb1 + drgb*(i)/($num2plot),'linewidth',3)
+        cmap = [cmap;rgb1 + drgb*(i)/($num2plot)];
+        %plot(px(1),py(1),'r.','markersize',20)
+    end
+    plot($xf_dr,$xf_cr,'g.','markersize',20)
+    colormap(cmap);
+    pp = colorbar;
+    pp.Ticks = 0:(1/$num2plot):1;
+    pp.Location = 'northoutside';
+    pp.TickLabels = 0:round($num2plot);
+    xlabel('downrange (km)')
+    ylabel('crossrange (km)')
+    %xlim([250,700])
+    %ylim([0,20])
+    hold off
+    fleg = legend('figure()');
+    set(fleg,'visible','off')
+    %addpath('/Users/kevintracy/devel/WiggleSat/matlab2tikz-master/src')
+    %matlab2tikz(strcat('cpeg_examples/bank_angle/tikz/',$id,'_crdr.tex'))
+    %close all
+    "
+
+    # this one is for plotting
+    mat"
+    figure
+    hold on
+    rgb1 = [29 38 113]/255;
+    rgb2 = 1.3*[195 55 100]/255;
+    drgb = rgb2-rgb1;
+    cmap = [];
+    for i = 1:round($num2plot)
+        px = $drhist{i};
+        alt = $althist{i};
+        plot(px,alt,'Color',rgb1 + drgb*(i)/($num2plot),'linewidth',3)
+        cmap = [cmap;rgb1 + drgb*(i)/($num2plot)];
+    end
+    plot($xf_dr,$xf_cr,'g.','markersize',20)
+    colormap(cmap);
+    pp = colorbar;
+    pp.Ticks = 0:(1/$num2plot):1;
+    pp.Location = 'northoutside';
+    pp.TickLabels = 0:round($num2plot);
+    plot([0,800],ones( 2,1)*10,'r' )
+    plot($xf_dr,10,'g.','markersize',20)
+    %xlim([400,700])
+    %ylim([8,30])
+    xlabel('downrange (km)')
+    ylabel('altitude (km)')
+    hold off
+    %saveas(gcf,'alt.png')
+    fleg = legend('figure()');
+    set(fleg,'visible','off')
+    %addpath('/Users/kevintracy/devel/WiggleSat/matlab2tikz-master/src')
+    %matlab2tikz(strcat('cpeg_examples/bank_angle/tikz/',$id,'_altdr.tex'))
+    %matlab2tikz('bankaoa_alt.tex')
+    %close all
+    "
+    return nothing
+end
 
 tt()

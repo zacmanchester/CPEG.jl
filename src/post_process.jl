@@ -10,6 +10,13 @@ function postprocess(ev::EntryVehicle,X,x0)
     end
     return alt, dr, cr
 end
+
+function postprocess_scaled(ev::EntryVehicle,X,x0_s)
+    X = unscale_X(ev.scale,X)
+    x0 = x0_s/ev.scale.dscale
+    alt, dr, cr = postprocess(ev,X,x0)
+    return alt,dr,cr
+end
 # function processU(model::EntryVehicle,X,U)
 #     N = length(X)
 #     AoA = zeros(N-1)
