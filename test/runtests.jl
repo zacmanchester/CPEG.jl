@@ -13,3 +13,7 @@ end
 @testset "Rollout Tests" begin
     include("rollouttest.jl")
 end
+
+@testset "Scaling Tests" begin
+    include("scalingtest.jl")
+end
