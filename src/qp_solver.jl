@@ -122,7 +122,7 @@ end
 function rhs_kkt_a!(qp::QP)
     idx = qp.idx
     qp.rhs_a[idx.x] = -(qp.A'*qp.y + qp.G'*qp.z + qp.Q*qp.x + qp.q)
-    qp.rhs_a[idx.s] = -(qp.z)
+    qp.rhs_a[idx.s] = -(qp.s .* qp.z)
     qp.rhs_a[idx.z] = -(qp.G*qp.x + qp.s - qp.h)
     qp.rhs_a[idx.y] = -(qp.A*qp.x - qp.b)
     return nothing
@@ -157,7 +157,7 @@ end
 function rhs_kkt_c!(qp::QP, σ, μ)
     idx = qp.idx
     qp.rhs_c .= 0
-    qp.rhs_c[idx.s] = (σ*μ .- (qp.Δ.s_a .* qp.Δ.z_a)) ./ qp.s
+    qp.rhs_c[idx.s] = (σ*μ .- (qp.Δ.s_a .* qp.Δ.z_a))
     return nothing
 end
 function combine_deltas!(qp::QP)
@@ -290,8 +290,8 @@ end
 
 function update_kkt!(qp::QP)
     idx = qp.idx
-    qp.KKT[idx.s, idx.s] = Diagonal(qp.z ./ qp.s)
-    qp.KKT[idx.s, idx.z] = I(idx.ns)
+    qp.KKT[idx.s, idx.s] = Diagonal(qp.z)#Diagonal(qp.z ./ qp.s)
+    qp.KKT[idx.s, idx.z] = Diagonal(qp.s)#I(idx.ns)
     return nothing
 end
 
