@@ -5,8 +5,7 @@ A Julia implementation of [CPEG](http://roboticexplorationlab.org/papers/ktracy_
 
 The desired API is the following:
 
-```
-
+```julia
 using CPEG
 
 # initialize workspace
@@ -20,5 +19,4 @@ cp.U = U # for some U
 
 # call call the alg
 U_new = update_trajectory(cp,r,v) # cartesian position and velocity in MCMF
-
 ```
