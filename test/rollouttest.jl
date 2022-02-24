@@ -1,5 +1,5 @@
 
-# ev = CPEG.EntryVehicle()
+# ev = CPEG.CPEGWorkspace()
 #
 # Rm = ev.params.gravity.R
 # r0 = SA[Rm+125e3, 0.0, 0.0] #Atmospheric interface at 125 km altitude
@@ -70,7 +70,7 @@ end
 
 
 
-ev1 = CPEG.EntryVehicle()
+ev1 = CPEG.CPEGWorkspace()
 
 Rm = ev1.params.gravity.R
 r0 = SA[Rm+125e3, 0.0, 0.0] #Atmospheric interface at 125 km altitude
@@ -81,7 +81,7 @@ v0 = V0*SA[sin(γ0), cos(γ0), 0.0]
 
 X1 = test_rollout(ev1,r0,v0,σ0)
 
-ev2 = CPEG.EntryVehicle()
+ev2 = CPEG.CPEGWorkspace()
 
 ev2.scale.dscale = 1.0
 ev2.scale.tscale = 1.0

@@ -1,6 +1,6 @@
 
 
-ev = CPEG.EntryVehicle()
+ev = CPEG.CPEGWorkspace()
 
 ev.scale.dscale = 124.92
 ev.scale.tscale = 0.324

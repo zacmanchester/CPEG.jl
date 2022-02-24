@@ -1,5 +1,5 @@
 
-function dynamics(ev::EntryVehicle, x::SVector{7,T}, u::SVector{1,W}) where {T,W}
+function dynamics(ev::CPEGWorkspace, x::SVector{7,T}, u::SVector{1,W}) where {T,W}
 
     # scaled variables
     r_scaled = x[SA[1,2,3]]
@@ -39,7 +39,7 @@ function dynamics(ev::EntryVehicle, x::SVector{7,T}, u::SVector{1,W}) where {T,W
 end
 
 function rk4(
-    ev::EntryVehicle,
+    ev::CPEGWorkspace,
     x_n::SVector{7,T},
     u::SVector{1,W},
     dt::Float64) where {T,W}
@@ -51,7 +51,7 @@ function rk4(
     return (x_n + (1/6)*(k1 + 2*k2 + 2*k3 + k4))
 end
 
-function rollout(ev::EntryVehicle,x0::SVector{7,T},U_in::Vector{SVector{1,T}},dt::Float64) where T
+function rollout(ev::CPEGWorkspace,x0::SVector{7,T},U_in::Vector{SVector{1,T}},dt::Float64) where T
     """everything in and out of the function is scaled"""
     N = 1000
     X = [@SVector zeros(length(x0)) for i = 1:N]
@@ -85,7 +85,7 @@ function rollout(ev::EntryVehicle,x0::SVector{7,T},U_in::Vector{SVector{1,T}},dt
 end
 
 function get_jacobians(
-    ev::EntryVehicle,
+    ev::CPEGWorkspace,
     X::Vector{SVector{7,T}},
     U::Vector{SVector{1,T}},
     dt::Float64
@@ -101,7 +101,7 @@ end
 
 # let
 #
-#     ev = EntryVehicle()
+#     ev = CPEGWorkspace()
 #
 #     # # @show ev.scale.uscale
 #     #

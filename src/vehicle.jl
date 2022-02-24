@@ -18,12 +18,12 @@ struct Planet
     end
 end
 
-struct EntryVehicle
+struct CPEGWorkspace
     params::Parameters
     scale::Scaling
     planet::Planet
     solver_opts::SolverSettings
-    function EntryVehicle()
+    function CPEGWorkspace()
         new(Parameters(),Scaling(),Planet(),SolverSettings())
     end
 end
@@ -32,10 +32,10 @@ end
 
 
 # # density methods
-# @inline function altitude(ev::EntryVehicle,r::SVector{3,T}) where T
+# @inline function altitude(ev::CPEGWorkspace,r::SVector{3,T}) where T
 #     norm(r) - ev.params.gravity.R
 # end
 #
-# @inline function density(ev::EntryVehicle,r::SVector{3,T}) where T
+# @inline function density(ev::CPEGWorkspace,r::SVector{3,T}) where T
 #     return density(ev.params.density,altitude(ev,r))
 # end

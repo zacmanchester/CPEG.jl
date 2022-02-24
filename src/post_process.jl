@@ -1,5 +1,5 @@
 
-function postprocess(ev::EntryVehicle,X,x0)
+function postprocess(ev::CPEGWorkspace,X,x0)
     N = length(X)
     alt = zeros(N)
     cr = zeros(N)
@@ -11,13 +11,13 @@ function postprocess(ev::EntryVehicle,X,x0)
     return alt, dr, cr
 end
 
-function postprocess_scaled(ev::EntryVehicle,X,x0_s)
+function postprocess_scaled(ev::CPEGWorkspace,X,x0_s)
     X = unscale_X(ev.scale,X)
     x0 = x0_s/ev.scale.dscale
     alt, dr, cr = postprocess(ev,X,x0)
     return alt,dr,cr
 end
-# function processU(model::EntryVehicle,X,U)
+# function processU(model::CPEGWorkspace,X,U)
 #     N = length(X)
 #     AoA = zeros(N-1)
 #     bank = zeros(N-1)
@@ -41,7 +41,7 @@ function anglebetween(r1,r2)
     end
     return acos(dp)
 end
-function rangedistances(ev::EntryVehicle,x::StaticVector,x0::StaticVector)
+function rangedistances(ev::CPEGWorkspace,x::StaticVector,x0::StaticVector)
 
     # first we get the angular momentum
     r0 = x0[1:3]

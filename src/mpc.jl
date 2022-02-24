@@ -8,7 +8,7 @@ using SuiteSparse
 using MATLAB
 
 function eg_mpc_quad(
-    ev::EntryVehicle,
+    ev::CPEGWorkspace,
     A::Vector{SMatrix{7, 7, Float64, 49}},
     B::Vector{SMatrix{7, 1, Float64, 7}},
     X::Vector{SVector{7,Float64}},
@@ -130,7 +130,7 @@ end
 function tt()
 
 
-        ev = EntryVehicle()
+        ev = CPEGWorkspace()
         ev.solver_opts.verbose = false
 
         Rm = ev.params.gravity.R
