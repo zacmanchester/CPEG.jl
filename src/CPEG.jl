@@ -8,7 +8,9 @@ using StaticArrays
 using ForwardDiff
 using SparseArrays
 using SuiteSparse
+using Printf
 
+include("qp_solver.jl")
 include("atmosphere.jl")
 include("scaling.jl")
 include("gravity.jl")

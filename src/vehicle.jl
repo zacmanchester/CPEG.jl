@@ -22,8 +22,9 @@ struct EntryVehicle
     params::Parameters
     scale::Scaling
     planet::Planet
+    solver_opts::SolverSettings
     function EntryVehicle()
-        new(Parameters(),Scaling(),Planet())
+        new(Parameters(),Scaling(),Planet(),SolverSettings())
     end
 end
 

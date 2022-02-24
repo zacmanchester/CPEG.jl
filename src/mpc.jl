@@ -80,7 +80,9 @@ function eg_mpc_quad(
     G = [A_ineq;-A_ineq]
     h = [up_tr;-low_tr]
 
-    z = quadprog(Q,q,A,b,G,h)
+    z = quadprog(Q,q,A,b,G,h; verbose = ev.solver_opts.verbose,
+                              atol = ev.solver_opts.atol,
+                              max_iters = ev.solver_opts.max_iters)
     δx = [z[idx_x[i]] for i = 1:(N)]
     δu = [z[idx_u[i]] for i = 1:(N-1)]
 
@@ -129,6 +131,8 @@ function tt()
 
 
         ev = EntryVehicle()
+        ev.solver_opts.verbose = false
+
         Rm = ev.params.gravity.R
         r0 = SA[Rm+125e3, 0.0, 0.0] #Atmospheric interface at 125 km altitude
         V0 = 5.845e3 #Mars-relative velocity at interface of 5.845 km/sec

@@ -1,11 +1,4 @@
 
-using Printf
-# using LinearAlgebra, SparseArrays
-# # using Infiltrator
-# # using QDLDL, ECOS, Convex
-# using Convex, Mosek, MosekTools, Printf
-# using QDLDL
-
 struct IDX
     # contains the variable indexing stuff for [x;s;z;y]
     nx::Int64
@@ -49,6 +42,15 @@ struct DELTA
     end
 end
 
+mutable struct SolverSettings
+    verbose::Bool
+    max_iters::Int64
+    atol::Float64
+    function SolverSettings()
+        return new(false, 50, 1e-8)
+    end
+end
+
 struct QP
 
     # problem data
@@ -77,6 +79,9 @@ struct QP
 
     # deltas
     Δ::DELTA
+
+    # solver settings
+    opts::SolverSettings
 
     function QP(Q,q,A,b,G,h)
 
@@ -110,7 +115,7 @@ struct QP
         # deltas
         Δ = DELTA(nx,ns,nz,ny)
 
-        new(Q,q,A,b,G,h,x,s,z,y, KKT, rhs_a, rhs_c, p_a, p_c, idx, Δ)
+        new(Q,q,A,b,G,h,x,s,z,y, KKT, rhs_a, rhs_c, p_a, p_c, idx, Δ, SolverSettings())
     end
 
 
@@ -178,14 +183,16 @@ end
 
 function solveqp!(qp::QP)
 
-    @printf "iter     objv        gap       |Ax-b|    |Gx+s-h|    step\n"
-    @printf "---------------------------------------------------------\n"
+    if qp.opts.verbose
+        @printf "iter     objv        gap       |Ax-b|    |Gx+s-h|    step\n"
+        @printf "---------------------------------------------------------\n"
+    end
 
     initialize!(qp)
 
     initialize_kkt!(qp)
 
-    for i = 1:50
+    for i = 1:qp.opts.max_iters
 
         # update linear system for solves
         update_kkt!(qp)
@@ -218,6 +225,10 @@ function solveqp!(qp::QP)
         if logging(qp::QP,i,α)
             break
         end
+
+        if i == qp.opts.max_iters
+            @error "max iters on QP solver"
+        end
     end
 
     return nothing
@@ -231,11 +242,14 @@ function logging(qp::QP,iter,α)
     ineq_res = norm(qp.G*qp.x + qp.s - qp.h)
 
 
-    @printf("%3d   %10.3e  %9.2e  %9.2e  %9.2e  % 6.4f\n",
-          iter, J, gap, eq_res,
-          ineq_res, α)
+    if qp.opts.verbose
+        @printf("%3d   %10.3e  %9.2e  %9.2e  %9.2e  % 6.4f\n",
+              iter, J, gap, eq_res,
+              ineq_res, α)
+    end
 
-    return (gap<1e-8)
+    # check for convergence
+    return (gap<qp.opts.atol)
 end
 
 function initialize!(qp::QP)
@@ -295,8 +309,11 @@ function update_kkt!(qp::QP)
     return nothing
 end
 
-function quadprog(Q,q,A,b,G,h)
+function quadprog(Q,q,A,b,G,h; verbose = false, max_iters = 50, atol = 1e-8)
     qp = QP(Q,q,A,b,G,h)
+    qp.opts.verbose = verbose
+    qp.opts.max_iters = max_iters
+    qp.opts.atol = atol
     solveqp!(qp::QP)
     return qp.x
 end
