@@ -1,10 +1,10 @@
 
 struct Parameters
-    density::DensityParameters
+    density::CPEGDensityParameters
     gravity::GravityParameters
     aero::AeroParameters
     function Parameters()
-        new(DensityParameters(),GravityParameters(),AeroParameters())
+        new(CPEGDensityParameters(),GravityParameters(),AeroParameters())
     end
 end
 
@@ -18,16 +18,30 @@ struct Planet
     end
 end
 
+mutable struct COST
+    rf::SVector{3,Float64}
+    rf_s::SVector{3,Float64}
+    γ::Float64
+    σ_tr::Float64
+    function COST()
+        new(SA[1.,2.,3.],SA[1.,2.,3.], 1e3 , deg2rad(20))
+    end
+end
+
 struct CPEGWorkspace
     params::Parameters
     scale::Scaling
     planet::Planet
     solver_opts::SolverSettings
+    cost::COST
+    U::Vector{SVector{1,Float64}}
     function CPEGWorkspace()
-        new(Parameters(),Scaling(),Planet(),SolverSettings())
+        U = [SA[1.0], SA[1.0]]
+        new(Parameters(), Scaling(), Planet(), SolverSettings(), COST(), U)
     end
 end
 
+# function initialize_CPEG(p::)
 
 
 

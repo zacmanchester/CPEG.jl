@@ -3,7 +3,7 @@
 
 # import CPEG
 
-p = CPEG.DensityParameters()
+p = CPEG.CPEGDensityParameters()
 
 
 # this data came from a marsgramm output

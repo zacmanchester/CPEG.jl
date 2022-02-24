@@ -1,5 +1,5 @@
 
-struct DensityParameters
+struct CPEGDensityParameters
     a::Float64
     b::Float64
     c::Float64
@@ -9,7 +9,7 @@ struct DensityParameters
     g::Float64
     h::Float64
     i::Float64
-    function DensityParameters()
+    function CPEGDensityParameters()
         # default values from a marsgram sample
         p = [ -4.001833776317166
               -0.015696377977412
@@ -24,7 +24,7 @@ struct DensityParameters
     end
 end
 
-function density(p::DensityParameters, h::T) where T
+function density(p::CPEGDensityParameters, h::T) where T
    h = h / 1000
    if h > 125.0
        h = 125.0
@@ -40,7 +40,7 @@ end
 # let
 #
 #
-#     p = DensityParameters()
+#     p = CPEGDensityParameters()
 #
 #
 #     h = 30.0e3
