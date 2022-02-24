@@ -3,6 +3,7 @@ using CPEG
 using BenchmarkTools
 using StaticArrays
 using LinearAlgebra
+using SparseArrays
 
 import CPEG
 
@@ -16,4 +17,8 @@ end
 
 @testset "Scaling Tests" begin
     include("scalingtest.jl")
+end
+
+@testset "QP Tests" begin
+    include("qptest.jl")
 end
