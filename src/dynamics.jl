@@ -51,11 +51,14 @@ function rk4(
     return (x_n + (1/6)*(k1 + 2*k2 + 2*k3 + k4))
 end
 
-function rollout(ev::CPEGWorkspace,x0::SVector{7,T},U_in::Vector{SVector{1,T}}) where T
+function rollout(ev::CPEGWorkspace,x0::SVector{7,T}) where T
     """everything in and out of the function is scaled"""
 
     # scaled dt
     dt_s = ev.dt/ev.scale.tscale
+
+    # input U
+    U_in = ev.U
 
     N = 1000
     X = [@SVector zeros(length(x0)) for i = 1:N]
@@ -84,20 +87,20 @@ function rollout(ev::CPEGWorkspace,x0::SVector{7,T},U_in::Vector{SVector{1,T}}) 
     end
 
     X = X[1:end_idx]
-    U = U[1:(end_idx-1)]
-    return X, U
+    ev.U = U[1:(end_idx-1)]
+
+    return X
 end
 
 function get_jacobians(
     ev::CPEGWorkspace,
-    X::Vector{SVector{7,T}},
-    U::Vector{SVector{1,T}}) where T
+    X::Vector{SVector{7,T}}) where T
 
     dt_s = ev.dt/ev.scale.tscale
 
     N = length(X)
-    A = [ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt_s),X[i]) for i = 1:N-1]
-    B = [ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt_s),U[i]) for i = 1:N-1]
+    A = [ForwardDiff.jacobian(_x->rk4(ev,_x,ev.U[i],dt_s),X[i]) for i = 1:N-1]
+    B = [ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt_s),ev.U[i]) for i = 1:N-1]
     return A,B
 end
 

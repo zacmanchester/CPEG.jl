@@ -54,10 +54,8 @@ function test_rollout(ev,r0,v0,σ0)
 
     x0 = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
 
-    N = 100
-    U = [SA[0.0] for i = 1:N-1]
-    #
-    X,U = CPEG.rollout(ev, x0, U)
+
+    X = CPEG.rollout(ev, x0)
 
     # @show length(X)
 

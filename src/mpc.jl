@@ -28,8 +28,7 @@ function eg_mpc_quad(
     ev::CPEGWorkspace,
     A::Vector{SMatrix{7, 7, Float64, 49}},
     B::Vector{SMatrix{7, 1, Float64, 7}},
-    X::Vector{SVector{7,Float64}},
-    U::Vector{SVector{1,Float64}})
+    X::Vector{SVector{7,Float64}})
 
     # sizes for state and control
     nx = 7
@@ -72,17 +71,14 @@ function eg_mpc_quad(
     q = zeros(nz)
     for i = 1:(N-1)
         P[idx_u[i],idx_u[i]] = [1.0]
-        q[idx_u[i]] = [U[i][1]]
+        q[idx_u[i]] = [ev.U[i][1]]
     end
     rr = normalize(ev.cost.rf/ev.scale.dscale)
     Qn = ev.cost.γ*(I - rr*rr')
     P[idx_x[N][1:3],idx_x[N][1:3]] = Qn'*Qn
     q[idx_x[N][1:3]] = -(Qn'*Qn)'*(ev.cost.rf/ev.scale.dscale - X[N][1:3])
 
-    # Q = copy(P) #+ 1e-6*I
-    # q = copy(q)
-    # A = copy(A_eq)
-    # b = copy(up_eq)
+
     G = [A_ineq;-A_ineq]
     h = [up_tr;-low_tr]
 
@@ -92,25 +88,20 @@ function eg_mpc_quad(
     δx = [z[idx_x[i]] for i = 1:(N)]
     δu = [z[idx_u[i]] for i = 1:(N-1)]
 
-    # osqp = OSQP.Model()
-    # OSQP.setup!(osqp; P=P, q=q, A=A, l=(Lo), u=(Up), eps_abs = 1e-8, eps_rel = 1e-8, max_iter = 10000,polish = 1)
-    # results = OSQP.solve!(osqp)
-
-    # # recover solution
-    # δx = [results.x[idx_x[i]] for i = 1:(N)]
-    # δu = [results.x[idx_u[i]] for i = 1:(N-1)]
 
     # apply the δ's
     cX = X + δx
-    cU = U + δu
+    # cU = U + δu
 
-    return cU, norm(δu)
+    ev.U += δu
+
+    return norm(δu)
 
     # return cU
 
 end
 
-function main_cpeg(ev,x0_s,U)
+function main_cpeg(ev,x0_s)
 
     # vectors for storing trajectory information
     T = 20
@@ -119,16 +110,16 @@ function main_cpeg(ev,x0_s,U)
     crhist = [zeros(2) for i = 1:T]
     dunorm = zeros(T)
     for i = 1:T
-        X,U = rollout(ev, x0_s, U)
+        X = rollout(ev, x0_s)
 
         althist[i], drhist[i], crhist[i] = postprocess_scaled(ev,X,x0_s)
-        A,B = get_jacobians(ev,X,U)
-        U, ndu = eg_mpc_quad(ev,A,B,X,U)
+        A,B = get_jacobians(ev,X)
+        ndu = eg_mpc_quad(ev,A,B,X)
         @show ndu
         if ndu<1e-2
             @info "success"
             println("miss distance: ",norm(X[end][1:3] - ev.cost.rf/ev.scale.dscale)*ev.scale.dscale/1e3," km")
-            return U, althist[1:i], drhist[1:i], crhist[1:i]
+            return althist[1:i], drhist[1:i], crhist[1:i]
         end
     end
     @error "CPEG failed"
@@ -176,8 +167,8 @@ function tt()
         x0_s = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
 
 
-        N = 100
-        U = [SA[0.0] for i = 1:N-1]
+        # N = 100
+        # U = [SA[0.0] for i = 1:N-1]
         #
         # X,U = rollout(ev, x0_s, U, dt)
         # @show length(X)
@@ -203,18 +194,18 @@ function tt()
 
         # qp solver settings
         ev.solver_opts.verbose = false
-        ev.solver_opts.atol = 1e-5
+        ev.solver_opts.atol = 1e-8
         ev.solver_opts.max_iters = 50
 
         # MPC stuff
-        ev.cost.σ_tr = deg2rad(20)
-        ev.cost.rf = rf
+        ev.cost.σ_tr = deg2rad(20) # radians
+        ev.cost.rf = rf # goal position (meters, MCMF)
         ev.cost.γ = 1e3
 
         # sim stuff
-        ev.dt = 2.0
+        ev.dt = 2.0 # seconds
 
-        Ucpeg, althist, drhist, crhist = main_cpeg(ev,x0_s,U)
+        althist, drhist, crhist = main_cpeg(ev,x0_s)
 
         xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
 
