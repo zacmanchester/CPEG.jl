@@ -1,4 +1,21 @@
-
+# cd("/Users/kevintracy/.julia/dev/CPEG")
+# Pkg.activate(".")
+# cd("/Users/kevintracy/.julia/dev/CPEG/src")
+# using LinearAlgebra
+# using StaticArrays
+# using ForwardDiff
+# using SparseArrays
+# using SuiteSparse
+# using Printf
+#
+# include("qp_solver.jl")
+# include("atmosphere.jl")
+# include("scaling.jl")
+# include("gravity.jl")
+# include("aero_forces.jl")
+# include("vehicle.jl")
+# include("dynamics.jl")
+# include("post_process.jl")
 
 using LinearAlgebra
 using StaticArrays
@@ -70,8 +87,8 @@ function eg_mpc_quad(
     h = [up_tr;-low_tr]
 
     z = quadprog(P,q,A_eq,dyn_eq,G,h; verbose = ev.solver_opts.verbose,
-                              atol = ev.solver_opts.atol,
-                              max_iters = ev.solver_opts.max_iters)
+                                         atol = ev.solver_opts.atol,
+                                    max_iters = ev.solver_opts.max_iters)
     δx = [z[idx_x[i]] for i = 1:(N)]
     δu = [z[idx_u[i]] for i = 1:(N-1)]
 
@@ -93,7 +110,7 @@ function eg_mpc_quad(
 
 end
 
-function main_cpeg(ev,x0_s,U,dt)
+function main_cpeg(ev,x0_s,U)
 
     # vectors for storing trajectory information
     T = 20
@@ -102,10 +119,10 @@ function main_cpeg(ev,x0_s,U,dt)
     crhist = [zeros(2) for i = 1:T]
     dunorm = zeros(T)
     for i = 1:T
-        X,U = rollout(ev, x0_s, U, dt)
+        X,U = rollout(ev, x0_s, U)
 
         althist[i], drhist[i], crhist[i] = postprocess_scaled(ev,X,x0_s)
-        A,B = get_jacobians(ev,X,U,dt)
+        A,B = get_jacobians(ev,X,U)
         U, ndu = eg_mpc_quad(ev,A,B,X,U)
         @show ndu
         if ndu<1e-2
@@ -116,7 +133,29 @@ function main_cpeg(ev,x0_s,U,dt)
     end
     @error "CPEG failed"
 end
-
+# function main_cpeg(ev,x0_s,U,dt)
+#
+#     # vectors for storing trajectory information
+#     T = 20
+#     althist = [zeros(2) for i = 1:T]
+#     drhist = [zeros(2) for i = 1:T]
+#     crhist = [zeros(2) for i = 1:T]
+#     dunorm = zeros(T)
+#     for i = 1:T
+#         X,U = rollout(ev, x0_s, U, dt)
+#
+#         althist[i], drhist[i], crhist[i] = postprocess_scaled(ev,X,x0_s)
+#         A,B = get_jacobians(ev,X,U,dt)
+#         U, ndu = eg_mpc_quad(ev,A,B,X,U)
+#         @show ndu
+#         if ndu<1e-2
+#             @info "success"
+#             println("miss distance: ",norm(X[end][1:3] - ev.cost.rf/ev.scale.dscale)*ev.scale.dscale/1e3," km")
+#             return U, althist[1:i], drhist[1:i], crhist[1:i]
+#         end
+#     end
+#     @error "CPEG failed"
+# end
 function tt()
 
 
@@ -132,7 +171,7 @@ function tt()
 
         r0sc,v0sc = scale_rv(ev.scale,r0,v0)
 
-        dt = 2.0/ev.scale.tscale
+        # dt = 2.0/ev.scale.tscale
 
         x0_s = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
 
@@ -140,20 +179,20 @@ function tt()
         N = 100
         U = [SA[0.0] for i = 1:N-1]
         #
-        X,U = rollout(ev, x0_s, U, dt)
-        @show length(X)
+        # X,U = rollout(ev, x0_s, U, dt)
+        # @show length(X)
 
-        A,B= get_jacobians(ev,X,U,dt)
+        # A,B= get_jacobians(ev,X,U,dt)
 
-        @show cond(A[1])
-        @show A[2]
+        # @show cond(A[1])
+        # @show A[2]
 
-        @show B[2]
+        # @show B[2]
 
         Rf = Rm+10.0e3 #Parachute opens at 10 km altitude
         rf = Rf*SA[cos(7.869e3/Rf)*cos(631.979e3/Rf); cos(7.869e3/Rf)*sin(631.979e3/Rf); sin(7.869e3/Rf)]
-        @show Rf
-        @show norm(rf)
+        # @show Rf
+        # @show norm(rf)
         # rf_s = rf/ev.scale.dscale
 
 
@@ -170,10 +209,12 @@ function tt()
         # MPC stuff
         ev.cost.σ_tr = deg2rad(20)
         ev.cost.rf = rf
-        # ev.cost.rf_s = NaN*SA[1,2,3.0]
         ev.cost.γ = 1e3
 
-        Ucpeg, althist, drhist, crhist = main_cpeg(ev,x0_s,U,dt)
+        # sim stuff
+        ev.dt = 2.0
+
+        Ucpeg, althist, drhist, crhist = main_cpeg(ev,x0_s,U)
 
         xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
 

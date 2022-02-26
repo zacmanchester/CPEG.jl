@@ -42,17 +42,21 @@ function rk4(
     ev::CPEGWorkspace,
     x_n::SVector{7,T},
     u::SVector{1,W},
-    dt::Float64) where {T,W}
+    dt_s::Float64) where {T,W}
 
-    k1 = dt*dynamics(ev,x_n,u)
-    k2 = dt*dynamics(ev,x_n+k1/2,u)
-    k3 = dt*dynamics(ev,x_n+k2/2,u)
-    k4 = dt*dynamics(ev,x_n+k3,u)
+    k1 = dt_s*dynamics(ev,x_n,u)
+    k2 = dt_s*dynamics(ev,x_n+k1/2,u)
+    k3 = dt_s*dynamics(ev,x_n+k2/2,u)
+    k4 = dt_s*dynamics(ev,x_n+k3,u)
     return (x_n + (1/6)*(k1 + 2*k2 + 2*k3 + k4))
 end
 
-function rollout(ev::CPEGWorkspace,x0::SVector{7,T},U_in::Vector{SVector{1,T}},dt::Float64) where T
+function rollout(ev::CPEGWorkspace,x0::SVector{7,T},U_in::Vector{SVector{1,T}}) where T
     """everything in and out of the function is scaled"""
+
+    # scaled dt
+    dt_s = ev.dt/ev.scale.tscale
+
     N = 1000
     X = [@SVector zeros(length(x0)) for i = 1:N]
     U = [@SVector zeros(length(U_in[1])) for i = 1:N]
@@ -61,7 +65,7 @@ function rollout(ev::CPEGWorkspace,x0::SVector{7,T},U_in::Vector{SVector{1,T}},d
     for i = 1:N-1
         U[i] = (i>length(U_in)) ? U_in[end] : U_in[i]
 
-        X[i+1] = rk4(ev,X[i],U[i],dt)
+        X[i+1] = rk4(ev,X[i],U[i],dt_s)
 
         # for debugging purposes
         # @show (norm(X[i+1][1:3])*ev.scale.dscale - ev.params.gravity.R)/1e3
@@ -87,13 +91,13 @@ end
 function get_jacobians(
     ev::CPEGWorkspace,
     X::Vector{SVector{7,T}},
-    U::Vector{SVector{1,T}},
-    dt::Float64
-    ) where T
+    U::Vector{SVector{1,T}}) where T
+
+    dt_s = ev.dt/ev.scale.tscale
 
     N = length(X)
-    A = [ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt),X[i]) for i = 1:N-1]
-    B = [ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt),U[i]) for i = 1:N-1]
+    A = [ForwardDiff.jacobian(_x->rk4(ev,_x,U[i],dt_s),X[i]) for i = 1:N-1]
+    B = [ForwardDiff.jacobian(_u->rk4(ev,X[i],_u,dt_s),U[i]) for i = 1:N-1]
     return A,B
 end
 

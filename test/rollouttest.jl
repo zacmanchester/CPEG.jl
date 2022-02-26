@@ -49,14 +49,15 @@ function test_rollout(ev,r0,v0,σ0)
 
     r0sc,v0sc = CPEG.scale_rv(ev.scale,r0,v0)
 
-    dt = 1.0/ev.scale.tscale
+    # dt = 1.0/ev.scale.tscale
+    ev.dt = 1.0
 
     x0 = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
 
     N = 100
     U = [SA[0.0] for i = 1:N-1]
     #
-    X,U = CPEG.rollout(ev, x0, U, dt)
+    X,U = CPEG.rollout(ev, x0, U)
 
     # @show length(X)
 
