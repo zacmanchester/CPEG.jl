@@ -61,8 +61,6 @@ function eg_mpc_quad(
 
     # constraint bounds
     dyn_eq = zeros((N)*nx) # N-1 dynamics constraints + N IC constraint
-    # low_x0 = zeros(nx)
-    # up_x0 = zeros(nx)
     up_tr = ev.cost.σ_tr*ones(N)
     low_tr = -ev.cost.σ_tr*ones(N)
 
@@ -73,10 +71,17 @@ function eg_mpc_quad(
         P[idx_u[i],idx_u[i]] = [1.0]
         q[idx_u[i]] = [ev.U[i][1]]
     end
-    rr = normalize(ev.cost.rf/ev.scale.dscale)
-    Qn = ev.cost.γ*(I - rr*rr')
+
+    # normalized final position vector
+    # rr = normalize(ev.cost.rf/ev.scale.dscale)
+
+    # projection matrix onto the landing plane
+    # Qn = ev.cost.γ*(I - rr*rr')
+    Qn = ev.cost.γ*landing_plane_proj(ev.cost.rf)
+
+    # cost terms for terminal cost
     P[idx_x[N][1:3],idx_x[N][1:3]] = Qn'*Qn
-    q[idx_x[N][1:3]] = -(Qn'*Qn)'*(ev.cost.rf/ev.scale.dscale - X[N][1:3])
+    q[idx_x[N][1:3]] = -(Qn'*Qn)*(ev.cost.rf/ev.scale.dscale - X[N][1:3])
 
 
     G = [A_ineq;-A_ineq]
@@ -90,17 +95,28 @@ function eg_mpc_quad(
 
 
     # apply the δ's
-    cX = X + δx
+    # cX = X + δx
     # cU = U + δu
 
     ev.U += δu
 
     return norm(δu)
-
-    # return cU
-
 end
 
+function landing_plane_proj(rf)
+    rr = normalize(rf)
+    I - rr*rr'
+end
+
+function calc_miss_distance!(ev::CPEGWorkspace,X)
+    Qn = landing_plane_proj(ev.cost.rf)
+    rf_sim = X[end][1:3]*ev.scale.dscale
+    ev.miss_distance = norm(Qn*(rf_sim - ev.cost.rf))
+end
+
+function update_σ!(ev::CPEGWorkspace,X)
+    ev.σ = [X[i][7] for i = 1:length(X)]
+end
 function main_cpeg(ev,x0_s)
 
     # vectors for storing trajectory information
@@ -118,35 +134,16 @@ function main_cpeg(ev,x0_s)
         @show ndu
         if ndu<1e-2
             @info "success"
-            println("miss distance: ",norm(X[end][1:3] - ev.cost.rf/ev.scale.dscale)*ev.scale.dscale/1e3," km")
+            # Qn = landing_plane_proj(ev.cost.rf)
+            calc_miss_distance!(ev,X)
+            # println("miss distance: ",norm(Qn*(X[end][1:3] - ev.cost.rf/ev.scale.dscale))*ev.scale.dscale/1e3," km")
+            println("miss distance: ",ev.miss_distance/1e3," km")
             return althist[1:i], drhist[1:i], crhist[1:i]
         end
     end
     @error "CPEG failed"
 end
-# function main_cpeg(ev,x0_s,U,dt)
-#
-#     # vectors for storing trajectory information
-#     T = 20
-#     althist = [zeros(2) for i = 1:T]
-#     drhist = [zeros(2) for i = 1:T]
-#     crhist = [zeros(2) for i = 1:T]
-#     dunorm = zeros(T)
-#     for i = 1:T
-#         X,U = rollout(ev, x0_s, U, dt)
-#
-#         althist[i], drhist[i], crhist[i] = postprocess_scaled(ev,X,x0_s)
-#         A,B = get_jacobians(ev,X,U,dt)
-#         U, ndu = eg_mpc_quad(ev,A,B,X,U)
-#         @show ndu
-#         if ndu<1e-2
-#             @info "success"
-#             println("miss distance: ",norm(X[end][1:3] - ev.cost.rf/ev.scale.dscale)*ev.scale.dscale/1e3," km")
-#             return U, althist[1:i], drhist[1:i], crhist[1:i]
-#         end
-#     end
-#     @error "CPEG failed"
-# end
+
 function tt()
 
 
