@@ -12,8 +12,7 @@ function eg_mpc_quad(
     A::Vector{SMatrix{7, 7, Float64, 49}},
     B::Vector{SMatrix{7, 1, Float64, 7}},
     X::Vector{SVector{7,Float64}},
-    U::Vector{SVector{1,Float64}},
-    rf_s::SVector{3,Float64})
+    U::Vector{SVector{1,Float64}})
 
     # sizes for state and control
     nx = 7
@@ -45,42 +44,32 @@ function eg_mpc_quad(
     end
 
     # constraint bounds
-    low_dyneq = zeros((N-1)*nx)
-    up_dyneq = copy(low_dyneq)
-    low_x0 = zeros(nx)
-    up_x0 = zeros(nx)
-    up_tr = deg2rad(20)*ones(N)
-    low_tr = -deg2rad(20)*ones(N)
-
-    low_eq = [low_dyneq;low_x0]
-    up_eq = [up_dyneq;up_x0]
-    # stack everything up
-
-    A = [A_eq;A_ineq]
-    Lo = [low_eq;low_tr]
-    Up = [up_eq;up_tr]
+    dyn_eq = zeros((N)*nx) # N-1 dynamics constraints + N IC constraint
+    # low_x0 = zeros(nx)
+    # up_x0 = zeros(nx)
+    up_tr = ev.cost.σ_tr*ones(N)
+    low_tr = -ev.cost.σ_tr*ones(N)
 
     # cost function terms
-    R = 1
     P = spzeros(nz,nz)
     q = zeros(nz)
     for i = 1:(N-1)
-        P[idx_u[i],idx_u[i]] = [R]
-        q[idx_u[i]] = [R*U[i][1]]
+        P[idx_u[i],idx_u[i]] = [1.0]
+        q[idx_u[i]] = [U[i][1]]
     end
-    rr = normalize(rf_s)
-    Qn = 1000*(I - rr*rr')
+    rr = normalize(ev.cost.rf/ev.scale.dscale)
+    Qn = ev.cost.γ*(I - rr*rr')
     P[idx_x[N][1:3],idx_x[N][1:3]] = Qn'*Qn
-    q[idx_x[N][1:3]] = -(Qn'*Qn)'*(rf_s - X[N][1:3])
+    q[idx_x[N][1:3]] = -(Qn'*Qn)'*(ev.cost.rf/ev.scale.dscale - X[N][1:3])
 
-    Q = copy(P) #+ 1e-6*I
-    q = copy(q)
-    A = copy(A_eq)
-    b = copy(up_eq)
+    # Q = copy(P) #+ 1e-6*I
+    # q = copy(q)
+    # A = copy(A_eq)
+    # b = copy(up_eq)
     G = [A_ineq;-A_ineq]
     h = [up_tr;-low_tr]
 
-    z = quadprog(Q,q,A,b,G,h; verbose = ev.solver_opts.verbose,
+    z = quadprog(P,q,A_eq,dyn_eq,G,h; verbose = ev.solver_opts.verbose,
                               atol = ev.solver_opts.atol,
                               max_iters = ev.solver_opts.max_iters)
     δx = [z[idx_x[i]] for i = 1:(N)]
@@ -104,7 +93,7 @@ function eg_mpc_quad(
 
 end
 
-function main_cpeg(ev,x0_s,U,dt,rf_s)
+function main_cpeg(ev,x0_s,U,dt)
 
     # vectors for storing trajectory information
     T = 20
@@ -117,10 +106,11 @@ function main_cpeg(ev,x0_s,U,dt,rf_s)
 
         althist[i], drhist[i], crhist[i] = postprocess_scaled(ev,X,x0_s)
         A,B = get_jacobians(ev,X,U,dt)
-        U, ndu = eg_mpc_quad(ev,A,B,X,U,rf_s)
+        U, ndu = eg_mpc_quad(ev,A,B,X,U)
         @show ndu
         if ndu<1e-2
             @info "success"
+            println("miss distance: ",norm(X[end][1:3] - ev.cost.rf/ev.scale.dscale)*ev.scale.dscale/1e3," km")
             return U, althist[1:i], drhist[1:i], crhist[1:i]
         end
     end
@@ -162,20 +152,34 @@ function tt()
 
         Rf = Rm+10.0e3 #Parachute opens at 10 km altitude
         rf = Rf*SA[cos(7.869e3/Rf)*cos(631.979e3/Rf); cos(7.869e3/Rf)*sin(631.979e3/Rf); sin(7.869e3/Rf)]
-        rf_s = rf/ev.scale.dscale
+        @show Rf
+        @show norm(rf)
+        # rf_s = rf/ev.scale.dscale
 
 
-        eg_mpc_quad(ev,A,B,X,U,rf_s)
+        # eg_mpc_quad(ev,A,B,X,U,rf_s)
 
 
         @info "cPEG TIME"
-        Ucpeg, althist, drhist, crhist = main_cpeg(ev,x0_s,U,dt,rf_s)
+
+        # qp solver settings
+        ev.solver_opts.verbose = false
+        ev.solver_opts.atol = 1e-5
+        ev.solver_opts.max_iters = 50
+
+        # MPC stuff
+        ev.cost.σ_tr = deg2rad(20)
+        ev.cost.rf = rf
+        # ev.cost.rf_s = NaN*SA[1,2,3.0]
+        ev.cost.γ = 1e3
+
+        Ucpeg, althist, drhist, crhist = main_cpeg(ev,x0_s,U,dt)
 
         xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
 
 
         num2plot = float(length(althist))
-        plot_groundtracks(drhist,crhist,althist,xf_dr,xf_cr,num2plot,"quad")
+        # plot_groundtracks(drhist/1e3,crhist/1e3,althist/1e3,xf_dr/1e3,xf_cr/1e3,num2plot,"quad")
         # @show xf_dr/1e3
         # @show xf_cr/1e3
         # X,U = rollout(ev,x0_s,Ucpeg,dt)
@@ -257,7 +261,7 @@ function plot_groundtracks(drhist,crhist,althist,xf_dr,xf_cr,num2plot,id)
         plot(px,alt,'Color',rgb1 + drgb*(i)/($num2plot),'linewidth',3)
         cmap = [cmap;rgb1 + drgb*(i)/($num2plot)];
     end
-    plot($xf_dr,$xf_cr,'g.','markersize',20)
+    %plot($xf_dr,$xf_cr,'g.','markersize',20)
     colormap(cmap);
     pp = colorbar;
     pp.Ticks = 0:(1/$num2plot):1;

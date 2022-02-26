@@ -180,6 +180,9 @@ function update_vars!(qp::QP,α)
     return nothing
 end
 
+struct QPMaxItersError <: Exception
+    var::Symbol
+end
 
 function solveqp!(qp::QP)
 
@@ -227,7 +230,7 @@ function solveqp!(qp::QP)
         end
 
         if i == qp.opts.max_iters
-            @error "max iters on QP solver"
+            throw(QPMaxItersError)
         end
     end
 
