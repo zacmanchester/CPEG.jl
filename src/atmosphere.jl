@@ -35,16 +35,3 @@ function density(p::CPEGDensityParameters, h::T) where T
    den = @evalpoly(h, 1.0, p.b, p.d, p.f, p.h)
    exp(num/den)
 end
-
-
-# let
-#
-#
-#     p = CPEGDensityParameters()
-#
-#
-#     h = 30.0e3
-#
-#     @btime density($p,$h)
-#
-# end

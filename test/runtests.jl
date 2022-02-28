@@ -7,18 +7,22 @@ using SparseArrays
 
 import CPEG
 
-@testset "Atmosphere Tests" begin
+@testset "Atmosphere" begin
     include("atmotest.jl")
 end
 
-@testset "Rollout Tests" begin
+@testset "Gravity" begin
+    include("gravtest.jl")
+end
+
+@testset "Rollout" begin
     include("rollouttest.jl")
 end
 
-@testset "Scaling Tests" begin
+@testset "Scaling" begin
     include("scalingtest.jl")
 end
 
-@testset "QP Tests" begin
+@testset "QP" begin
     include("qptest.jl")
 end

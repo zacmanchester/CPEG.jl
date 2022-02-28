@@ -25,16 +25,3 @@ end
                            y*(1 - Re_r_sqr*(five_z_sqr - 1)),
                            z*(1 - Re_r_sqr*(five_z_sqr - 3))]
 end
-
-# let
-#
-#     g = GravityParameters()
-#
-#     r = 1.0*3386200.0*normalize(randn(3))
-#
-#     r = SVector{3}(r)
-#
-#     @show norm(gravity(g,r))
-#     # @btime gravity($g,$r)
-#
-# end
