@@ -189,6 +189,12 @@ function tt()
 
         @info "cPEG TIME"
 
+        # vehicle parameters
+        ev.params.aero.Cl = 0.29740410453983374
+        ev.params.aero.Cd = 1.5284942035954776
+        ev.params.aero.A = 15.904312808798327    # m²
+        ev.params.aero.m = 2400.0                # kg
+
         # qp solver settings
         ev.solver_opts.verbose = false
         ev.solver_opts.atol = 1e-8

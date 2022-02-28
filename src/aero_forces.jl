@@ -1,5 +1,5 @@
 
-struct AeroParameters
+mutable struct AeroParameters
     Cl::Float64
     Cd::Float64
     A::Float64
