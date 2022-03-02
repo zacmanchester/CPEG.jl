@@ -72,32 +72,27 @@ function eg_mpc_quad(
         q[idx_u[i]] = [ev.U[i][1]]
     end
 
-    # normalized final position vector
-    # rr = normalize(ev.cost.rf/ev.scale.dscale)
-
     # projection matrix onto the landing plane
-    # Qn = ev.cost.γ*(I - rr*rr')
     Qn = ev.cost.γ*landing_plane_proj(ev.cost.rf)
 
     # cost terms for terminal cost
     P[idx_x[N][1:3],idx_x[N][1:3]] = Qn'*Qn
     q[idx_x[N][1:3]] = -(Qn'*Qn)*(ev.cost.rf/ev.scale.dscale - X[N][1:3])
 
-
+    # setup standard form QP
     G = [A_ineq;-A_ineq]
     h = [up_tr;-low_tr]
 
+    # solve with QP solver (src/qp_solver.jl)
     z = quadprog(P,q,A_eq,dyn_eq,G,h; verbose = ev.solver_opts.verbose,
                                          atol = ev.solver_opts.atol,
                                     max_iters = ev.solver_opts.max_iters)
+
+    # pull out δx and δu from z
     δx = [z[idx_x[i]] for i = 1:(N)]
     δu = [z[idx_u[i]] for i = 1:(N-1)]
 
-
-    # apply the δ's
-    # cX = X + δx
-    # cU = U + δu
-
+    # update U = U + δu
     ev.U += δu
 
     return norm(δu)
@@ -107,41 +102,42 @@ function landing_plane_proj(rf)
     rr = normalize(rf)
     I - rr*rr'
 end
-
-function calc_miss_distance!(ev::CPEGWorkspace,X)
+function update_miss_distance!(ev::CPEGWorkspace,X::Vector{SVector{7,Float64}})
+    ev.miss_distance = miss_distance(ev,X)
+    return nothing
+end
+function miss_distance(ev::CPEGWorkspace,X::Vector{SVector{7,Float64}})
     Qn = landing_plane_proj(ev.cost.rf)
     rf_sim = X[end][1:3]*ev.scale.dscale
-    ev.miss_distance = norm(Qn*(rf_sim - ev.cost.rf))
+    norm(Qn*(rf_sim - ev.cost.rf))
 end
 
 function update_σ!(ev::CPEGWorkspace,X)
     ev.σ = [X[i][7] for i = 1:length(X)]
 end
+
 function main_cpeg(ev,x0_s)
 
-    # vectors for storing trajectory information
-    T = 20
-    althist = [zeros(2) for i = 1:T]
-    drhist = [zeros(2) for i = 1:T]
-    crhist = [zeros(2) for i = 1:T]
-    dunorm = zeros(T)
-    for i = 1:T
-        X = rollout(ev, x0_s)
+    old_md = NaN
+    new_md = NaN
+    ndu = NaN
 
-        althist[i], drhist[i], crhist[i] = postprocess_scaled(ev,X,x0_s)
+    @printf "iter    miss (km)    Δmiss (km)     |U|         N\n"
+    @printf "--------------------------------------------------\n"
+    for i = 1:ev.max_cpeg_iter
+        X = rollout(ev, x0_s)
+        old_md = new_md
+        new_md = miss_distance(ev,X)
+
+        @printf("%3d     %9.3e    %9.3e    %9.3e    %3d \n", i, new_md/1e3,abs(new_md - old_md)/1e3, ndu, length(X))
+        if (abs(new_md - old_md) < 100)
+            return nothing
+        end
+
         A,B = get_jacobians(ev,X)
         ndu = eg_mpc_quad(ev,A,B,X)
-        @show ndu
-        if ndu<1e-2
-            @info "success"
-            # Qn = landing_plane_proj(ev.cost.rf)
-            calc_miss_distance!(ev,X)
-            # println("miss distance: ",norm(Qn*(X[end][1:3] - ev.cost.rf/ev.scale.dscale))*ev.scale.dscale/1e3," km")
-            println("miss distance: ",ev.miss_distance/1e3," km")
-            return althist[1:i], drhist[1:i], crhist[1:i]
-        end
     end
-    @error "CPEG failed"
+    @error "CPEG failed: reached max iters"
 end
 
 function tt()
@@ -208,12 +204,13 @@ function tt()
         # sim stuff
         ev.dt = 2.0 # seconds
 
-        althist, drhist, crhist = main_cpeg(ev,x0_s)
+        # althist, drhist, crhist = main_cpeg(ev,x0_s)
+        main_cpeg(ev,x0_s)
 
-        xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
+        # xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
 
 
-        num2plot = float(length(althist))
+        # num2plot = float(length(althist))
         # plot_groundtracks(drhist/1e3,crhist/1e3,althist/1e3,xf_dr/1e3,xf_cr/1e3,num2plot,"quad")
         # @show xf_dr/1e3
         # @show xf_cr/1e3

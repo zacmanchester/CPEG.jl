@@ -38,9 +38,11 @@ mutable struct CPEGWorkspace
     miss_distance::Float64
     dt::Float64
     σ::Vector{Float64}
+    max_cpeg_iter::Int64
+    miss_distance_tol::Float64
     function CPEGWorkspace()
         U = [SA[0.0] for i = 1:1000]
-        new(Parameters(), Scaling(), Planet(), SolverSettings(), COST(), U,0.0,0.0,zeros(2))
+        new(Parameters(), Scaling(), Planet(), SolverSettings(), COST(), U,0.0,0.0,zeros(2),20,1e3)
     end
 end
 

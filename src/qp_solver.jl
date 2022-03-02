@@ -240,9 +240,9 @@ end
 function logging(qp::QP,iter,α)
 
     J = 0.5*qp.x'*qp.Q*qp.x + dot(qp.q,qp.x)
-    gap = dot(qp.s,qp.z)
-    eq_res = norm(qp.A*qp.x - qp.b)
-    ineq_res = norm(qp.G*qp.x + qp.s - qp.h)
+    gap = dot(qp.s,qp.z)/length(qp.s)
+    eq_res = norm(qp.A*qp.x - qp.b,Inf)
+    ineq_res = norm(qp.G*qp.x + qp.s - qp.h,Inf)
 
 
     if qp.opts.verbose
@@ -252,7 +252,11 @@ function logging(qp::QP,iter,α)
     end
 
     # check for convergence
-    return (gap<qp.opts.atol)
+    if (eq_res < 1e-10) & (ineq_res < 1e-10) & (gap<qp.opts.atol)
+        return true
+    else
+        return false
+    end
 end
 
 function initialize!(qp::QP)
