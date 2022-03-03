@@ -83,10 +83,17 @@ function eg_mpc_quad(
     G = [A_ineq;-A_ineq]
     h = [up_tr;-low_tr]
 
-    # solve with QP solver (src/qp_solver.jl)
-    z = quadprog(P,q,A_eq,dyn_eq,G,h; verbose = ev.solver_opts.verbose,
-                                         atol = ev.solver_opts.atol,
-                                    max_iters = ev.solver_opts.max_iters)
+    # solve the equality only constrained QP
+    sol = lu([P A_eq';A_eq spzeros(N*nx,N*nx)])\[-q;dyn_eq]
+    z = sol[1:length(q)]
+
+    # if this violates the inequality constraints, then we send it to quadprog
+    if sum(G*z .> h) != 0
+        # solve with QP solver (src/qp_solver.jl)
+        z = quadprog(P,q,A_eq,dyn_eq,G,h; verbose = ev.qp_solver_opts.verbose,
+                                             atol = ev.qp_solver_opts.atol,
+                                        max_iters = ev.qp_solver_opts.max_iters)
+    end
 
     # pull out δx and δu from z
     δx = [z[idx_x[i]] for i = 1:(N)]
@@ -122,18 +129,28 @@ function main_cpeg(ev,x0_s)
     new_md = NaN
     ndu = NaN
 
-    @printf "iter    miss (km)    Δmiss (km)     |U|         N\n"
-    @printf "--------------------------------------------------\n"
+    if ev.verbose
+        @printf "iter    miss (km)    Δmiss (km)     |ΔU|        N\n"
+        @printf "--------------------------------------------------\n"
+    end
     for i = 1:ev.max_cpeg_iter
+
+        # rollout and check miss distance
         X = rollout(ev, x0_s)
         old_md = new_md
         new_md = miss_distance(ev,X)
 
-        @printf("%3d     %9.3e    %9.3e    %9.3e    %3d \n", i, new_md/1e3,abs(new_md - old_md)/1e3, ndu, length(X))
-        if (abs(new_md - old_md) < 100)
+        if ev.verbose
+            @printf("%3d     %9.3e    %9.3e    %9.3e    %3d \n",
+                    i, new_md/1e3,abs(new_md - old_md)/1e3, ndu, length(X))
+        end
+
+        # check termination criteria
+        if (abs(new_md - old_md) < ev.miss_distance_tol) | (ndu < ev.ndu_tol)
             return nothing
         end
 
+        # linearize and solve QP
         A,B = get_jacobians(ev,X)
         ndu = eg_mpc_quad(ev,A,B,X)
     end
@@ -144,7 +161,7 @@ function tt()
 
 
         ev = CPEGWorkspace()
-        ev.solver_opts.verbose = false
+        # ev.solver_opts.verbose = false
 
         Rm = ev.params.gravity.R
         r0 = SA[Rm+125e3, 0.0, 0.0] #Atmospheric interface at 125 km altitude
@@ -192,9 +209,9 @@ function tt()
         ev.params.aero.m = 2400.0                # kg
 
         # qp solver settings
-        ev.solver_opts.verbose = false
-        ev.solver_opts.atol = 1e-8
-        ev.solver_opts.max_iters = 50
+        ev.qp_solver_opts.verbose = false
+        ev.qp_solver_opts.atol = 1e-8
+        ev.qp_solver_opts.max_iters = 50
 
         # MPC stuff
         ev.cost.σ_tr = deg2rad(20) # radians
@@ -203,6 +220,12 @@ function tt()
 
         # sim stuff
         ev.dt = 2.0 # seconds
+
+        # CPEG settings
+        ev.verbose = true
+        ev.ndu_tol = 1e-4
+        ev.max_cpeg_iter = 30
+        ev.miss_distance_tol = 1e2  # m
 
         # althist, drhist, crhist = main_cpeg(ev,x0_s)
         main_cpeg(ev,x0_s)

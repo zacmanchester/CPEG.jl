@@ -32,7 +32,7 @@ mutable struct CPEGWorkspace
     params::Parameters
     scale::Scaling
     planet::Planet
-    solver_opts::SolverSettings
+    qp_solver_opts::SolverSettings
     cost::COST
     U::Vector{SVector{1,Float64}}
     miss_distance::Float64
@@ -40,9 +40,11 @@ mutable struct CPEGWorkspace
     σ::Vector{Float64}
     max_cpeg_iter::Int64
     miss_distance_tol::Float64
+    ndu_tol::Float64
+    verbose::Bool
     function CPEGWorkspace()
         U = [SA[0.0] for i = 1:1000]
-        new(Parameters(), Scaling(), Planet(), SolverSettings(), COST(), U,0.0,0.0,zeros(2),20,1e3)
+        new(Parameters(), Scaling(), Planet(), SolverSettings(), COST(), U,0.0,0.0,zeros(2),20,1e3,1e-2,true)
     end
 end
 
