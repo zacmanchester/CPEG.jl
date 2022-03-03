@@ -119,7 +119,7 @@ function miss_distance(ev::CPEGWorkspace,X::Vector{SVector{7,Float64}})
     norm(Qn*(rf_sim - ev.cost.rf))
 end
 
-function update_σ!(ev::CPEGWorkspace,X)
+function update_σ!(ev::CPEGWorkspace,X::Vector{SVector{7,Float64}})
     ev.σ = [X[i][7] for i = 1:length(X)]
 end
 
@@ -147,6 +147,7 @@ function main_cpeg(ev,x0_s)
 
         # check termination criteria
         if (abs(new_md - old_md) < ev.miss_distance_tol) | (ndu < ev.ndu_tol)
+            update_σ!(ev,X)
             return nothing
         end
 
@@ -232,6 +233,13 @@ function tt()
 
         # xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
 
+        pp = ev.σ
+
+        mat"
+        figure
+        hold on
+        plot(rad2deg($pp))
+        hold off"
 
         # num2plot = float(length(althist))
         # plot_groundtracks(drhist/1e3,crhist/1e3,althist/1e3,xf_dr/1e3,xf_cr/1e3,num2plot,"quad")
