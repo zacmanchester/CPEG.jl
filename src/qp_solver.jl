@@ -226,15 +226,16 @@ function solveqp!(qp::QP)
         update_vars!(qp,α)
 
         if logging(qp::QP,i,α)
-            break
+            return i
+            # break
         end
 
-        if i == qp.opts.max_iters
-            throw(QPMaxItersError)
-        end
+        # if i == qp.opts.max_iters
+            # throw(QPMaxItersError)
+        # end
     end
-
-    return nothing
+    throw(QPMaxItersError)
+    # return nothing
 end
 
 function logging(qp::QP,iter,α)
@@ -321,6 +322,6 @@ function quadprog(Q,q,A,b,G,h; verbose = false, max_iters = 50, atol = 1e-8)
     qp.opts.verbose = verbose
     qp.opts.max_iters = max_iters
     qp.opts.atol = atol
-    solveqp!(qp::QP)
-    return qp.x
+    qp_iters = solveqp!(qp::QP)
+    return qp.x, qp_iters
 end

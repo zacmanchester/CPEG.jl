@@ -63,7 +63,10 @@ end
 
 # here is a feasible QP
 for N = 5:5:150
-    @test typeof(CPEG.quadprog(create_MPC(N)...)) == Vector{Float64}
+    local z, iters = CPEG.quadprog(create_MPC(N)...)
+    @test typeof(z) == Vector{Float64}
+    @test iters >= 1
+    @test iters <= ev.qp_solver_opts.max_iters
 end
 
 # for N = 10:10:100

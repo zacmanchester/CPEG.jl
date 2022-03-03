@@ -165,11 +165,20 @@ function main_cpeg(ev, r, v, σ)
     error("CPEG failed: reached max iters")
 end
 
+function scale_state(ev,r,v,σ)
+    rs,vs = scale_rv(ev.scale,r,v)
+    SVector{7}([rs;vs;σ])
+end
+function unscale_state(ev,x)
+    rs = x[SA[1,2,3]]
+    vs = x[SA[4,5,6]]
+    r,v = unscale_rv(ev.scale,rs,vs)
+    return r,v,x[7]
+end
 function tt()
 
 
         ev = CPEGWorkspace()
-        # ev.solver_opts.verbose = false
 
         Rm = ev.params.gravity.R
         r0 = SA[Rm+125e3, 0.0, 0.0] #Atmospheric interface at 125 km altitude
@@ -178,37 +187,9 @@ function tt()
         v0 = V0*SA[sin(γ0), cos(γ0), 0.0]
         σ0 = deg2rad(3)
 
-        r0sc,v0sc = scale_rv(ev.scale,r0,v0)
-
-        # dt = 2.0/ev.scale.tscale
-
-        x0_s = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
-
-
-        # N = 100
-        # U = [SA[0.0] for i = 1:N-1]
-        #
-        # X,U = rollout(ev, x0_s, U, dt)
-        # @show length(X)
-
-        # A,B= get_jacobians(ev,X,U,dt)
-
-        # @show cond(A[1])
-        # @show A[2]
-
-        # @show B[2]
-
         Rf = Rm+10.0e3 #Parachute opens at 10 km altitude
         rf = Rf*SA[cos(7.869e3/Rf)*cos(631.979e3/Rf); cos(7.869e3/Rf)*sin(631.979e3/Rf); sin(7.869e3/Rf)]
-        # @show Rf
-        # @show norm(rf)
-        # rf_s = rf/ev.scale.dscale
 
-
-        # eg_mpc_quad(ev,A,B,X,U,rf_s)
-
-
-        # @info "cPEG TIME"
 
         # vehicle parameters
         ev.params.aero.Cl = 0.29740410453983374
@@ -227,7 +208,7 @@ function tt()
         ev.cost.γ = 1e3
 
         # sim stuff
-        ev.dt = 1.5 # seconds
+        ev.dt = 2.0 # seconds
 
         # CPEG settings
         ev.verbose = true
@@ -237,96 +218,49 @@ function tt()
 
         ev.scale.uscale = 1e1
 
-        # althist, drhist, crhist = main_cpeg(ev,x0_s)
-        # main_cpeg(ev,x0_s)
-        main_cpeg(ev,r0,v0,σ0)
-        r02 = r0 - SA[100,600,4.2e3]
-        main_cpeg(ev,r02,v0,σ0)
-        # r02sc = (r0 + SA[100,600,1.2e3])/ev.scale.dscale
+        N = 10
+        X = [@SVector zeros(7) for i = 1:N]
+        X[1] = scale_state(ev,r0,v0,σ0)
+        # main_cpeg(ev,r0,v0,σ0)
+        # main_cpeg(ev,unscale_state(ev,X[1])...)
+        # @show unscale_state(ev,X[1])
+        # @show r0
+        # @show v0
+        # @show σ0
+        for i = 1:N-1
 
-        # @info "first"
-        # x0_s = SVector{7}([r0sc;v0sc;σ0])
-        # X1 = rollout(ev, x0_s)
-        # A,B = get_jacobians(ev,X)
-        #
-        # @info "second"
-        # x0_s2 = SVector{7}([r0sc;v0sc;σ0])
-        # X2 = rollout(ev, x0_s2)
-        #
-        # @info "first"
-        # A,B = get_jacobians(ev,X1)
-        #
-        # @info "second"
-        # A,B = get_jacobians(ev,X2)
-        # A,B = get_jacobians(ev,X)
-        #
+            # call cpeg
+            main_cpeg(ev, unscale_state(ev,X[i])...)
 
-        # @info "---------------------------first------------------------------"
-        # x0_s = SVector{7}([r0sc;v0sc;σ0])
-        # X = rollout(ev, x0_s)
-        # # A,B = get_jacobians(ev,X)
-        # ForwardDiff.jacobian(_x->dynamics(ev,_x,ev.U[1]),X[1])
-        #
-        # @info "---------------------------second------------------------------"
-        # x0_s2 = SVector{7}([r02sc;v0sc;σ0])
-        # X2 = rollout(ev, x0_s2)
-        # # A,B = get_jacobians(ev,X2)
-        # ForwardDiff.jacobian(_x->dynamics(ev,_x,ev.U[1]),X2[1])
-        # @show typeof(r0)
-        # @show typeof(r02)
+            X[i+1] = rk4(ev,X[i],ev.U[1],ev.dt/ev.scale.tscale)
+
+        end
+
+
+        # # althist, drhist, crhist = main_cpeg(ev,x0_s)
+        # # main_cpeg(ev,x0_s)
+        # main_cpeg(ev,r0,v0,σ0)
+        # r02 = r0 - SA[100,600,4.2e3]
         # main_cpeg(ev,r02,v0,σ0)
         #
-        # # xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
-        #
-        pp2 = ev.σ
-        pp = [ev.U[i][1] for i = 1:length(ev.U)]
-        #
-        mat"
-        figure
-        hold on
-        title('Control')
-        %plot(rad2deg($pp))
-        plot($pp)
-        hold off"
-
-        mat"
-        figure
-        title('Bank angle deg')
-        hold on
-        plot(rad2deg($pp2))
-        hold off"
-
-        # num2plot = float(length(althist))
-        # plot_groundtracks(drhist/1e3,crhist/1e3,althist/1e3,xf_dr/1e3,xf_cr/1e3,num2plot,"quad")
-        # @show xf_dr/1e3
-        # @show xf_cr/1e3
-        # X,U = rollout(ev,x0_s,Ucpeg,dt)
-        # X = unscale_X(ev.scale,X)
-        # # @show typeof(X[1][SA[1,2,3]])
-        #
-        # alt, dr, cr = postprocess(ev,X,[r0;v0])
-        #
-        # σ = [X[i][7] for i = 1:length(X)]
-        #
+        # pp2 = ev.σ
+        # pp = [ev.U[i][1] for i = 1:length(ev.U)]
+        # #
         # mat"
         # figure
         # hold on
-        # plot($alt/1e3)
-        # hold off "
-        #
-        # mat"
-        # figure
-        # hold on
-        # plot($dr/1e3,$cr/1e3)
+        # title('Control')
+        # %plot(rad2deg($pp))
+        # plot($pp)
         # hold off"
         #
         # mat"
         # figure
+        # title('Bank angle deg')
         # hold on
-        # title('Bank Angle')
-        # plot(rad2deg($σ))
-        # hold off
-        # "
+        # plot(rad2deg($pp2))
+        # hold off"
+
 
         return nothing
 end

@@ -58,7 +58,7 @@ function rollout(ev::CPEGWorkspace,x0::SVector{7,T}) where T
     dt_s = ev.dt/ev.scale.tscale
 
     # input U
-    U_in = ev.U
+    U_in = copy(ev.U)
 
     N = 1000
     X = [@SVector zeros(length(x0)) for i = 1:N]
