@@ -26,10 +26,12 @@ end
 
 function density(p::CPEGDensityParameters, h::T) where T
    h = h / 1000
+
+   # clamp in a forward diff friendly way
    if h > 125.0
-       h = 125.0
+       h = one(h)*125.0
    elseif h < 0.2
-       h = 0.2
+       h = one(h)*0.2
    end
    num = @evalpoly(h, p.a, p.c, p.e, p.g, p.i)
    den = @evalpoly(h, 1.0, p.b, p.d, p.f, p.h)

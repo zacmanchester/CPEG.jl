@@ -123,7 +123,10 @@ function update_σ!(ev::CPEGWorkspace,X::Vector{SVector{7,Float64}})
     ev.σ = [X[i][7] for i = 1:length(X)]
 end
 
-function main_cpeg(ev,x0_s)
+function main_cpeg(ev, r, v, σ)
+
+    rs, vs = scale_rv(ev.scale,r,v)
+    x0_s = SVector{7}([rs;vs;σ])
 
     old_md = NaN
     new_md = NaN
@@ -201,7 +204,7 @@ function tt()
         # eg_mpc_quad(ev,A,B,X,U,rf_s)
 
 
-        @info "cPEG TIME"
+        # @info "cPEG TIME"
 
         # vehicle parameters
         ev.params.aero.Cl = 0.29740410453983374
@@ -229,17 +232,52 @@ function tt()
         ev.miss_distance_tol = 1e2  # m
 
         # althist, drhist, crhist = main_cpeg(ev,x0_s)
-        main_cpeg(ev,x0_s)
+        # main_cpeg(ev,x0_s)
+        main_cpeg(ev,r0,v0,σ0)
 
-        # xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
+        # r02sc = (r0 + SA[100,600,1.2e3])/ev.scale.dscale
 
-        pp = ev.σ
+        # @info "first"
+        # x0_s = SVector{7}([r0sc;v0sc;σ0])
+        # X1 = rollout(ev, x0_s)
+        # A,B = get_jacobians(ev,X)
+        #
+        # @info "second"
+        # x0_s2 = SVector{7}([r0sc;v0sc;σ0])
+        # X2 = rollout(ev, x0_s2)
+        #
+        # @info "first"
+        # A,B = get_jacobians(ev,X1)
+        #
+        # @info "second"
+        # A,B = get_jacobians(ev,X2)
+        # A,B = get_jacobians(ev,X)
+        #
 
-        mat"
-        figure
-        hold on
-        plot(rad2deg($pp))
-        hold off"
+        # @info "---------------------------first------------------------------"
+        # x0_s = SVector{7}([r0sc;v0sc;σ0])
+        # X = rollout(ev, x0_s)
+        # # A,B = get_jacobians(ev,X)
+        # ForwardDiff.jacobian(_x->dynamics(ev,_x,ev.U[1]),X[1])
+        #
+        # @info "---------------------------second------------------------------"
+        # x0_s2 = SVector{7}([r02sc;v0sc;σ0])
+        # X2 = rollout(ev, x0_s2)
+        # # A,B = get_jacobians(ev,X2)
+        # ForwardDiff.jacobian(_x->dynamics(ev,_x,ev.U[1]),X2[1])
+        # @show typeof(r0)
+        # @show typeof(r02)
+        # main_cpeg(ev,r02,v0,σ0)
+        #
+        # # xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
+        #
+        # pp = ev.σ
+        #
+        # mat"
+        # figure
+        # hold on
+        # plot(rad2deg($pp))
+        # hold off"
 
         # num2plot = float(length(althist))
         # plot_groundtracks(drhist/1e3,crhist/1e3,althist/1e3,xf_dr/1e3,xf_cr/1e3,num2plot,"quad")
@@ -349,3 +387,34 @@ function plot_groundtracks(drhist,crhist,althist,xf_dr,xf_cr,num2plot,id)
 end
 
 tt()
+
+
+# # incorrect
+# typeof(ev.params.aero) = AeroParameters
+# typeof(ρ) = Float64
+# typeof(r) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#475#479"{Int64, CPEGWorkspace, Float64}, Float64}, Float64, 7}}
+# typeof(v) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#475#479"{Int64, CPEGWorkspace, Float64}, Float64}, Float64, 7}}
+#
+# # correct
+# typeof(ev.params.aero) = AeroParameters
+# typeof(ρ) = ForwardDiff.Dual{ForwardDiff.Tag{var"#477#481"{Int64, CPEGWorkspace, Vector{SVector{7, Float64}}, Float64}, Float64}, Float64, 1}
+# typeof(r) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#477#481"{Int64, CPEGWorkspace, Vector{SVector{7, Float64}}, Float64}, Float64}, Float64, 1}}
+# typeof(v) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#477#481"{Int64, CPEGWorkspace, Vector{SVector{7, Float64}}, Float64}, Float64}, Float64, 1}}
+
+
+
+# # succeeding
+# typeof(r) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#1006#1007"{CPEGWorkspace}, Float64}, Float64, 7}}
+# typeof(h) = ForwardDiff.Dual{ForwardDiff.Tag{var"#1006#1007"{CPEGWorkspace}, Float64}, Float64, 7}
+# typeof(ρ) = ForwardDiff.Dual{ForwardDiff.Tag{var"#1006#1007"{CPEGWorkspace}, Float64}, Float64, 7}
+# typeof(ev.params.aero) = AeroParameters
+# typeof(r) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#1006#1007"{CPEGWorkspace}, Float64}, Float64, 7}}
+# typeof(v) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#1006#1007"{CPEGWorkspace}, Float64}, Float64, 7}}
+#
+# # failing
+# typeof(r) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#1006#1007"{CPEGWorkspace}, Float64}, Float64, 7}}
+# typeof(h) = ForwardDiff.Dual{ForwardDiff.Tag{var"#1006#1007"{CPEGWorkspace}, Float64}, Float64, 7}
+# typeof(ρ) = Float64
+# typeof(ev.params.aero) = AeroParameters
+# typeof(r) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#1006#1007"{CPEGWorkspace}, Float64}, Float64, 7}}
+# typeof(v) = SVector{3, ForwardDiff.Dual{ForwardDiff.Tag{var"#1006#1007"{CPEGWorkspace}, Float64}, Float64, 7}}
