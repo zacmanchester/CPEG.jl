@@ -55,11 +55,12 @@ function test_rollout(ev,r0,v0,σ0)
     x0 = SA[r0sc[1],r0sc[2],r0sc[3],v0sc[1],v0sc[2],v0sc[3],σ0]
 
 
-    X = CPEG.rollout(ev, x0)
+    X, U = CPEG.rollout(ev, x0, ev.U)
 
     # @show length(X)
 
     @test length(X) == 241
+    @test length(U) == 241 - 1
     @test (norm((X[end])[1:3]) * ev.scale.dscale - ev.params.gravity.R)  < 10.0e3
     @test (norm((X[end-1])[1:3]) * ev.scale.dscale - ev.params.gravity.R) > 10.0e3
 

@@ -51,7 +51,7 @@ function rk4(
     return (x_n + (1/6)*(k1 + 2*k2 + 2*k3 + k4))
 end
 
-function rollout(ev::CPEGWorkspace,x0::SVector{7,T}) where T
+function rollout(ev::CPEGWorkspace,x0::SVector{7,T},U::Vector{SVector{1,T}}) where T
     """everything in and out of the function is scaled"""
 
     # scaled dt
@@ -66,7 +66,7 @@ function rollout(ev::CPEGWorkspace,x0::SVector{7,T}) where T
     X[1] = x0
     end_idx = NaN
     for i = 1:N-1
-        U[i] = (i>length(U_in)) ? U_in[end] : U_in[i]
+        U[i] = (i>length(U_in)) ? SA[0.0] : U_in[i]
 
         X[i+1] = rk4(ev,X[i],U[i],dt_s)
 
@@ -87,9 +87,9 @@ function rollout(ev::CPEGWorkspace,x0::SVector{7,T}) where T
     end
 
     X = X[1:end_idx]
-    ev.U = U[1:(end_idx-1)]
+    # ev.U = U[1:(end_idx-1)]
 
-    return X
+    return X, U[1:(end_idx-1)]
 end
 
 function get_jacobians(

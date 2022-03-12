@@ -81,7 +81,7 @@ function eg_mpc_quad(
     q[idx_x[N][1:3]] = -(Qn'*Qn)*(ev.cost.rf/ev.scale.dscale - X[N][1:3])
 
     # setup standard form QP
-    # P += 1e-4*I
+    P += 1e-6*I
     G = [A_ineq;-A_ineq]
     h = [up_tr;-low_tr]
 
@@ -136,14 +136,22 @@ function main_cpeg(ev, r, v, σ)
     ndu = NaN
     qp_iters = NaN
 
+    althist = [zeros(2) for i = 1:ev.max_cpeg_iter]
+    drhist = [zeros(2) for i = 1:ev.max_cpeg_iter]
+    crhist = [zeros(2) for i = 1:ev.max_cpeg_iter]
+    σhist = [zeros(2) for i = 1:ev.max_cpeg_iter]
+
     if ev.verbose
         @printf "iter    miss (km)    Δmiss (km)     |ΔU|        N   QP iters\n"
         @printf "----------------------------------------------------------\n"
     end
+
     for i = 1:ev.max_cpeg_iter
 
         # rollout and check miss distance
-        X, ev.U = rollout(ev, x0_s, ev.U)
+        X = rollout(ev, x0_s)
+        althist[i], drhist[i], crhist[i] = postprocess_scaled(ev,X,x0_s)
+        σhist[i]=[X[i][7] for i = 1:length(X)]
         old_md = new_md
         new_md = miss_distance(ev,X)
 
@@ -156,15 +164,14 @@ function main_cpeg(ev, r, v, σ)
         # flipping = (max(old_md,new_md)<5e3) & (i>5) & (qp_iters == 1)
 
         # check termination criteria
-        if (abs(new_md - old_md) < ev.miss_distance_tol) | (ndu < ev.ndu_tol) #| flipping
+        if (abs(new_md - old_md) < ev.miss_distance_tol) | (ndu < ev.ndu_tol) | (i == ev.max_cpeg_iter)#| flipping
             update_σ!(ev,X)
-            return nothing
+            return althist[1:i], drhist[1:i], crhist[1:i], σhist[1:i]
         end
 
         # linearize and solve QP
         A,B = get_jacobians(ev,X)
         ndu, qp_iters = eg_mpc_quad(ev,A,B,X)
-
     end
     error("CPEG failed: reached max iters")
 end
@@ -222,7 +229,7 @@ function tt()
 
         ev.scale.uscale = 1e1
 
-        N = 120
+        N = 100
         X = [@SVector zeros(7) for i = 1:N]
         U = [@SVector zeros(1) for i = 1:N-1]
         X[1] = scale_state(ev,r0,v0,σ0)
@@ -232,25 +239,39 @@ function tt()
         # @show r0
         # @show v0
         # @show σ0
-        for i = 1:N-1
-
+        # for i = 1:N-1
+            x0s = [3.394493027569473, 0.399591678638693, 0.001009766098441132, -1.456578872683738, 4.90997118202939, 0.11856550572023335, 1.002017922478615]
+            ev.U = SVector{1}.([[-1.0446874855627493], [-1.5480207770930021], [-2.0792718023435577], [-2.6165103698995678], [-3.133332980329963], [-3.602272358062922], [-3.998882259324137], [-4.305331038330731], [-4.512508731782757], [-4.6202527616273725], [-4.635962501176615], [-4.5722798946790375], [-4.444568523571758], [-4.268731622216839], [-4.059636636270206], [-3.8301827417699306], [-3.590907860816463], [-3.349978236653403], [-3.1134079271625916], [-2.8853876478909783],
+             [-2.6686409267757703], [-2.4647591748467277], [-2.274492048866316], [-2.0979855378265144], [-1.9349693968414852], [-1.7849000190375819], [-1.6470663824705791], [-1.5206666365829429], [-1.4048620459126708], [-1.2988138882311988], [-1.2017077791152193], [-1.1127688912168858], [-1.0312706985091609], [-0.9565392051243061], [-0.8879540970721507], [-0.8249478583856876], [-0.7670035961772956], [-0.7136520995286785], [-0.6644684966304356], [-0.6190687583989716], [-0.5771062134840089],
+              [-0.5382681804201349], [-0.5022727811224021], [-0.4688659711138508], [-0.4378188022176291], [-0.40892492032561795], [-0.38199829236131694], [-0.356871151306608], [-0.3333921451660487], [-0.3114246742864395], [-0.29084540102664813], [-0.2715429160242747], [-0.2534165459799516], [-0.23637528880207825], [-0.22033686300468008], [-0.2052268593482769], [-0.1909779838052427], [-0.1775293819838559], [-0.16482603613939062], [-0.1528182268259207], [-0.141461052095098],
+              [-0.13071399792837857], [-0.12054055430002916], [-0.11090787191443939], [-0.10178645524833921], [-0.09314988806239005], [-0.08497458803317286], [-0.07723958760150706], [-0.0699263385415113], [-0.06301853813160513], [-0.05650197515788373], [-0.050364394305557204], [-0.0445953777984172], [-0.0391862434320541], [-0.034129958415797114], [-0.029421068692721798], [-0.025055643647920903], [-0.021031236343760105], [-0.017346859638204308], [-0.014002978749707781],
+               [-0.011001521030997203], [-0.008345903905917261], [-0.006041082110155127], [-0.004093615560086733], [-0.002511759356214488], [-0.0013055776105475364], [-0.0004870829722087122], [-7.040391306118486e-5]])
             # call cpeg
             # @show X[i]
             # @show ev.U
+            # main_cpeg(ev, unscale_state(ev,X[i])...)
+            # for i = 1:length(ev.U)
+            #     ev.U[i] = SA[0.0]
+            # end
             ev.U = [ev.U[i+1] for i = 1:length(ev.U)-1]
-            # ev.U = [SA[0] for i = 1:length(ev.U)]
-            main_cpeg(ev, unscale_state(ev,X[i])...)
-            U[i] = ev.U[1]
+            r0, v0, σ0 = unscale_state(ev,x0s)
+            althist, drhist, crhist, σhist = main_cpeg(ev, r0,v0,σ0)
+            xf_dr, xf_cr = rangedistances(ev,rf,SVector{6}([r0;v0]))
 
-            dr = 0*(1000/ev.scale.dscale) * @SVector randn(3)
+
+            num2plot = float(length(althist))
+            plot_groundtracks(drhist/1e3,crhist/1e3,althist/1e3,σhist,xf_dr/1e3,xf_cr/1e3,num2plot,"quad")
+            # U[i] = ev.U[1]
+
+            # dr = 100/ev.scale.dscale * @SVector randn(3)
             # X[i]
             # dv = @SVector randn(3)
             # @show X[i]
-            X[i+1] = rk4(ev,X[i],ev.U[1],ev.dt/ev.scale.tscale) + SA[dr[1];dr[2];dr[3];0;0;0;0]
+            # X[i+1] = rk4(ev,X[i],ev.U[1],ev.dt/ev.scale.tscale) #+ SA[dr[1];dr[2];dr[3];0;0;0;0]
 
-        end
+        # end
 
-        alt, dr, cr = postprocess(ev,X,[r0;v0])
+        # alt, dr, cr = postprocess(ev,X,[r0;v0])
 
         # # althist, drhist, crhist = main_cpeg(ev,x0_s)
         # # main_cpeg(ev,x0_s)
@@ -280,7 +301,7 @@ function tt()
         return nothing
 end
 
-function plot_groundtracks(drhist,crhist,althist,xf_dr,xf_cr,num2plot,id)
+function plot_groundtracks(drhist,crhist,althist,σhist,xf_dr,xf_cr,num2plot,id)
 
     mat"
     figure
@@ -349,6 +370,34 @@ function plot_groundtracks(drhist,crhist,althist,xf_dr,xf_cr,num2plot,id)
     %matlab2tikz('bankaoa_alt.tex')
     %close all
     "
+
+    mat"
+    figure
+    hold on
+    rgb1 = [29 38 113]/255;
+    rgb2 = 1.3*[195 55 100]/255;
+    drgb = rgb2-rgb1;
+    cmap = [];
+    for i = 1:round($num2plot)
+        bank = $σhist{i};
+        plot(rad2deg(bank),'Color',rgb1 + drgb*(i)/($num2plot),'linewidth',3)
+        cmap = [cmap;rgb1 + drgb*(i)/($num2plot)];
+    end
+    colormap(cmap);
+    pp = colorbar;
+    pp.Ticks = 0:(1/$num2plot):1;
+    pp.Location = 'northoutside';
+    pp.TickLabels = 0:round($num2plot);
+    %xlim([400,700])
+    %ylim([8,30])
+    xlabel('step')
+    ylabel('bank angle (degrees)')
+    hold off
+    %saveas(gcf,'alt.png')
+    fleg = legend('figure()');
+    set(fleg,'visible','off')
+    "
+
     return nothing
 end
 
